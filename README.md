@@ -36,7 +36,8 @@ The algorithm is explained in detail in the accompinying paper (in the original 
 The algorithm can be run by running [main.py](src/main.py), make sure to set `init_build=True` if the NPMC solver hasn't been built before or if the configuration yaml file is changed.
 There are two sets of simulation environment available now: **test** and **FTD** (SDD not finished yet). To switch the environment, you need to change the import class in [main.py](src/main.py) and [trajectory_generator.py](src/trajectory_generator.py). Specifically, in [map_generator](src/map_generator) and [obstacle_scanner](src/obstacle_scanner), switch files between 'test' and 'ftd'.
 By changing `graph`, different predefined scenarios in test environment can be run. The configuration file is in [configs](configs). **Note**, some of the config parameters require a rebuild of the NMPC solver to take effect. 
+There are some settings like 'json_path' can be changed in [ftd_obstacle_scanner](src/obstacle_scanner/ftd_dynamic_obstacles). Change them, exspecially json file path to make it work.
 
-Scenarios can easily be created by using the GUI implemented in [draw_graph.py](src/utils/draw_graph.py) and appedning the output to [graphs.py](src/visibility/graphs.py).
+Scenarios can easily be created by using the GUI implemented in [draw_graph.py](src/utils/draw_graph.py).
 
 
