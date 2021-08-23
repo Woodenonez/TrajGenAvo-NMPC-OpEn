@@ -38,6 +38,6 @@ There are two sets of simulation environment available now: **test** and **FTD**
 By changing `graph`, different predefined scenarios in test environment can be run. The configuration file is in [configs](configs). **Note**, some of the config parameters require a rebuild of the NMPC solver to take effect. 
 There are some settings like 'json_path' can be changed in [ftd_obstacle_scanner](src/obstacle_scanner/ftd_dynamic_obstacles). Change them, exspecially json file path to make it work.
 
-Scenarios can easily be created by using the GUI implemented in [draw_graph.py](src/utils/draw_graph.py).
+Scenarios can easily be created by using the GUI implemented in [draw_graph_tool.py](src/utils/draw_graph_tool.py).
 
 
