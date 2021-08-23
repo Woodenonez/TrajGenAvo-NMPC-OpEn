@@ -3,12 +3,12 @@ This is a trajectory generator for mobile robots based on MPC and motion predict
 
 ## Original Work
 This code is originally from [mpc-trajectory-generator](https://github.com/wljungbergh/mpc-trajectory-generator) where you can also find the related paper published in CASE2021. Here, the code is restructured and stuffed with extra code to not only make it easier to read but also introduce other forms of dynamic obstacles. Please refer to the original code if you don't consider the MDN part.
+![Example](docs/example_image.png "Example")
 
 ## MDN Part
 The MDN part can be find in [Multimodal Motion Prediction - Evaluation Version](https://github.com/Woodenonez/multimodal_motion_prediction).
 The related paper is "Motion Prediction Based on Multiple Futures for Dynamic Obstacle Avoidance of Mobile Robots." published in CASE2021 as well.
 
-![Example](docs/example_image.png "Example")
 ## Dependencies
 
 ### OpEn
