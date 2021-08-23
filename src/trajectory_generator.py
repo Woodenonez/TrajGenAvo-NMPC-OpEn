@@ -30,6 +30,7 @@ File content:
     TrajectoryGenerator <class> - Build and run the MPC problem. Visualize the results.
 Comments:
     [MAP] --graph--> [PathAdvisor] --refernece path--> [TrajGenrator(Config)] <--dynamic obstacles-- [ObstacleScanner]
+    Note in plot_dynamic_results, 'plt.waitforbuttonpress()' is used to stop the animation from running automatically. Comment that if no need.
 '''
 
 class TrajectoryGenerator:
