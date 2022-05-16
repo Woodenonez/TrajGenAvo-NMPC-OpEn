@@ -19,6 +19,11 @@ File description:
 Comments:
                                                            V [MpcModule] V
     [MAP] --graph--> [PathAdvisor] --refernece path--> [TrajGenrator(Config)] <--dynamic obstacles-- [ObstacleScanner]
+
+Branches:
+    [main]: Using TCP/IP interface
+    [direct_interface]: Using Python binding direct interface to Rust
+    [new_demo]: Under construction
 '''
 
 ### Customize
