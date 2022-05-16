@@ -26,7 +26,7 @@ config_fn = 'default.yaml'
 init_build = False
 show_animation = True
 save_animation = False
-plot_prediction = False
+plot_prediction = True
 
 start = (1, 1.0, math.radians(0))
 end = (9.0, 1.0, math.radians(0))
@@ -34,7 +34,7 @@ end = (9.0, 1.0, math.radians(0))
 graph = Graph(start, end, index=11) # for test, index=0~11
 
 ### Configure MPC
-yaml_fp = os.path.join(str(Path(__file__).parent.parent), 'configs', config_fn)
+yaml_fp = os.path.join(Path(__file__).resolve().parents[1], 'configs', config_fn)
 configurator = Configurator(yaml_fp)
 config = configurator.configurate()
 
@@ -46,6 +46,5 @@ start = list(graph.start)
 end   = list(graph.end)
 xx,xy,uv,uomega,tot_solver_time,overhead_times = traj_gen.run(graph, start, end)
 
-### Plot results
+### Plot results (press any key to continue if dynamic)
 traj_gen.plot_results(xx,xy,uv,uomega, start, end, animation=show_animation, video=save_animation, plot_prediction=plot_prediction)
-plt.show()

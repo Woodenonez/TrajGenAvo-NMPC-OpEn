@@ -113,6 +113,7 @@ class TrajectoryGenerator:
 
         path_ax.legend(handles=legend_elems)
         path_ax.axis('equal')
+        plt.show()
 
     def plot_dynamic_results(self, xx, xy, vel, omega, start, end, make_video, plot_prediction):
         if make_video:

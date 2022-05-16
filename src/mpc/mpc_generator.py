@@ -219,15 +219,20 @@ class MpcModule:
             .with_penalty_constraints(obstacle_constraints) \
             .with_constraints(bounds) \
             .with_aug_lagrangian_constraints(acc_constraints, acc_bounds)
+
         build_config = og.config.BuildConfiguration() \
             .with_build_directory(self.config.build_directory) \
             .with_build_mode(self.config.build_type) \
             .with_tcp_interface_config()
+        # build_config.with_build_python_bindings()
+
         meta = og.config.OptimizerMeta() \
             .with_optimizer_name(self.config.optimizer_name)
+
         solver_config = og.config.SolverConfiguration() \
             .with_tolerance(1e-4) \
             .with_max_duration_micros(MAX_SOVLER_TIME)
+
         builder = og.builder.OpEnOptimizerBuilder(problem, meta, build_config, solver_config) \
             .with_verbosity_level(1)
         builder.build()
