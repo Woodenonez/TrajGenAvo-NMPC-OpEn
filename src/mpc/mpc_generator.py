@@ -222,9 +222,9 @@ class MpcModule:
 
         build_config = og.config.BuildConfiguration() \
             .with_build_directory(self.config.build_directory) \
-            .with_build_mode(self.config.build_type) \
-            .with_tcp_interface_config()
-        # build_config.with_build_python_bindings()
+            .with_build_mode(self.config.build_type)
+        build_config.with_build_python_bindings()
+        # build_config.with_tcp_interface_config()
 
         meta = og.config.OptimizerMeta() \
             .with_optimizer_name(self.config.optimizer_name)
@@ -239,13 +239,12 @@ class MpcModule:
 
         print(f'{self.print_name} MPC module built.')
 
-    def run(self, parameters, mng, take_steps, system_input, states):
+    def run(self, parameters, solver, take_steps, system_input, states):
         '''
         Description:
             Run the solver for the pre-defined MPC problem.
         Arguments:
             parameters   <list>   - All parameters used by MPC, defined in 'build'.
-            mng          <object> - OptimizerTcpManager from OpEN.
             take_steps   <int>    - The number of control step taken by the input (normally one).
             system_input <list>   - The overall input action.
             states       <list>   - The overall states.
@@ -255,21 +254,11 @@ class MpcModule:
         Comments:
             Here contains the motion model again (can be optimized).
         '''
-        solution = mng.call(parameters)
+        solution = solver.run(parameters)
         
-        if solution.is_ok():
-            # Solver returned a solution
-            solution_data = solution.get()
-            u = solution_data.solution
-            exit_status = solution_data.exit_status
-            solver_time = solution_data.solve_time_ms
-        else:
-            # Invocation failed - an error report is returned
-            solver_error = solution.get()
-            error_code = solver_error.code
-            error_msg = solver_error.message
-            mng.kill() # kill so rust code wont keep running if python crashes
-            raise RuntimeError(f"MPC Solver error: {error_msg}")
+        u = solution.solution
+        exit_status = solution.exit_status
+        solver_time = solution.solve_time_ms
         
         system_input += u[:self.config.nu*take_steps]
 

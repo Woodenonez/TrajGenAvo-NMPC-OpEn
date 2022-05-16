@@ -23,7 +23,7 @@ Comments:
 
 ### Customize
 config_fn = 'default.yaml'
-init_build = False
+init_build = True
 show_animation = True
 save_animation = False
 plot_prediction = True

@@ -73,6 +73,13 @@ class TrajectoryGenerator:
 
         if build:
             self.mpc_generator.build()
+        
+        self.import_solver()
+
+    def import_solver(self, root_dir=''):
+        sys.path.append(os.path.join(root_dir, self.config.build_directory, self.config.optimizer_name))
+        built_solver = __import__(self.config.optimizer_name)
+        self.solver = built_solver.solver()
 
     def plot_results(self, x_coords, y_coords, vel, omega, start, end, animation=False, video=False, plot_prediction=False):
         if animation:
@@ -251,9 +258,6 @@ class TrajectoryGenerator:
             'time_dict' See details in 'runtime_analysis'
         '''
         t_temp = time.time()  # Used to check run time for specific functions
-        mng = og.tcp.OptimizerTcpManager(self.config.build_directory + os.sep + self.config.optimizer_name)
-        mng.start()
-        mng.ping() # ensure RUST solver is up and runnings
         self.time_dict["launch_optimizer"] = int(1000*(time.time()-t_temp))
 
         # Initialize tuning parameters to be passed to solver
@@ -390,7 +394,7 @@ class TrajectoryGenerator:
                             stc_constraints + dyn_constraints
 
                 try:
-                    exit_status, solver_time = self.mpc_generator.run(params, mng, self.config.num_steps_taken, system_input, states)
+                    exit_status, solver_time = self.mpc_generator.run(params, self.solver, self.config.num_steps_taken, system_input, states)
                     self.solver_times.append(solver_time)
                 except RuntimeError as err:
                     print("Fatal: Cannot run.")
@@ -414,7 +418,7 @@ class TrajectoryGenerator:
         except KeyboardInterrupt:
             if self.vb:
                 print(f"{self.print_name} Killing TCP connection to MCP solver...")
-            mng.kill()
+            # mng.kill()
             ns = self.config.ns
             xx = states[0:len(states):ns]
             xy = states[1:len(states):ns]
@@ -423,7 +427,7 @@ class TrajectoryGenerator:
 
             return xx, xy, uv, uomega, self.solver_times, self.overhead_times
 
-        mng.kill()
+        # mng.kill()
 
         total_compute_time = int(1000*(time.time()-tt))   # from preparing to solving
         total_mpc_time     = int(1000*(time.time()-t_temp)) # MPC running time
@@ -521,7 +525,7 @@ class TrajectoryGenerator:
             return
 
         try:
-            file = open(file_name, "a")
+            file = open(save_path, "a")
             file.write('###############################################\n')
             file.write(str1+'\n')
             file.write('###############################################\n')
