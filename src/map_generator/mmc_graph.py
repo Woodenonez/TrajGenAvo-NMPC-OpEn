@@ -3,13 +3,14 @@ import sys, math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches
+from matplotlib.collections import PatchCollection
 
 '''
 File info:
-    Name    - [ftd_graph]
+    Name    - [mmc_graph]
     Exe     - [Yes]
 File description:
-    This contains the map of the synthetic factory traffic dataset.
+    This contains the map of the synthetic multimodal crossing (mmc) data.
 File content:
     Graph     <class> - Define the map.
 Comments:
@@ -21,9 +22,9 @@ class Graph:
     Description:
         Define a map.
     Arguments:
-        start <tuple> - The start point in 2D coordinates (useless here).
-        end   <tuple> - The end point in 2D coordinates (useless here).
-        index <int>   - Not used.
+        start <tuple> - The start point in 2D coordinates.
+        end   <tuple> - The end point in 2D coordinates.
+        index <int>   - Not used for now.
     Attributes:
         boundary_coordinates <list of tuples> - Each tuple is a vectex of the boundary polygon.
                                               - Defined in counter-clockwise ordering.
@@ -33,31 +34,38 @@ class Graph:
         plot_map <vis> - Visualization of the map. Plot directly.
     '''
     def __init__(self, start, end, index=0):
-        self.boundary_coordinates = [(0,0), (10.0,0), (10.0,2.5), (6.0,2.5), (6.0,4.5), (10.0,4.5), (10.0,6.5), (6.0,6.5), 
-                                     (6.0,10.0), (4.0,10.0), (4.0,6.5), (0,6.5), (0,4.5), (4.0,4.5), (4.0,2.5), (0,2.5)]  # in counter-clockwise ordering
-        self.obstacle_list = [[(5.3,2.3), (5.3,4.5), (5.7,4.5), (5.7,2.5)]] # in clock-wise ordering
+        self.boundary_coordinates = [(0, 0), (16, 0), (16, 10), (0, 10)]  # in counter-clockwise ordering
+        self.obstacle_list = [[(0, 1.5), (0, 1.6), (9, 1.6), (9, 1.5)],
+                              [(0, 8.4), (0, 8.5), (9, 8.5), (9, 8.4)],
+                              [(11, 1.5), (11, 1.6), (16, 1.6), (16, 1.5)],
+                              [(11, 8.4), (11, 8.5), (16, 8.5), (16, 8.4)]] # in clock-wise ordering
+        self.crossing_area = [(9, 1.5), (11, 1.5), (11, 8.5), (9, 8.5)]
         self.start = start
         self.end = end
 
     def plot_map(self):
         boundary = self.boundary_coordinates + [self.boundary_coordinates[0]]
         boundary = np.array(boundary)
-        fig, ax = plt.subplots()
-        plt.plot(boundary[:,0], boundary[:,1], 'k')
+        _, ax = plt.subplots()
+        ax.plot(boundary[:,0], boundary[:,1], 'k')
+        ax.plot([0, 16], [5, 5], c='orange', linestyle='--')
+        ax.fill_between([0, 16], [1.6, 1.6], [8.4, 8.4], color='lightgray')
+        crossing = patches.Polygon(self.crossing_area, hatch='-', fc='white', ec='gray')
+        ax.add_patch(crossing)
         for obs in self.obstacle_list:
             obs_edge = obs + [obs[0]]
             xs, ys = zip(*obs_edge)
-            plt.plot(xs,ys,'b')
+            plt.plot(xs,ys,'k')
 
             obs = np.array(obs)
-            poly = patches.Polygon(obs, color='skyblue')
+            poly = patches.Polygon(obs, color='k')
             ax.add_patch(poly)
         plt.plot(self.start[0], self.start[1], 'b*')
         plt.plot(self.end[0], self.end[1], 'r*')
         plt.show()
 
 if __name__ == '__main__':
-    start = (1, 1.0, math.radians(0))
-    end = (9.0, 1.0, math.radians(0))
+    start = (0, 3.3, math.radians(0))
+    end = (16, 3.3, math.radians(0))
     graph = Graph(start, end)
     graph.plot_map()

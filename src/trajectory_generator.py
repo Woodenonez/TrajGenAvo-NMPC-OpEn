@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 ### Choose the right file for scanner and advisor
-from obstacle_scanner.test_dynamic_obstacles import ObstacleScanner
+from obstacle_scanner.mmc_dynamic_obstacles import ObstacleScanner
 from path_advisor.visibility import PathAdvisor
 
 from mpc.mpc_generator import MpcModule
