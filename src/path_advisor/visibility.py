@@ -1,9 +1,7 @@
-import os, sys, warnings
-import math, timeit
-import numpy as np
+import os, sys
+import math
 import matplotlib.pyplot as plt 
 
-import pyclipper
 import extremitypathfinder.extremitypathfinder as epf
 from extremitypathfinder.extremitypathfinder import PolygonEnvironment
 from extremitypathfinder.plotting import PlottingEnvironment, draw_prepared_map
@@ -20,7 +18,7 @@ File description:
 ### Helper functions
 def plot_line_segments(line_segments, ax, color:str):
     for i in range(len(line_segments)-1):
-        plt.plot([line_segments[i][0], line_segments[i+1][0]], [line_segments[i][1], line_segments[i+1][1]], color)
+        ax.plot([line_segments[i][0], line_segments[i+1][0]], [line_segments[i][1], line_segments[i+1][1]], color)
 def plot_polygon(polygon, ax, color='b', label=None):
     plot_line_segments(polygon, ax, color)
     ax.plot([polygon[-1][0], polygon[0][0]], [polygon[-1][1], polygon[0][1]], color, label=label)
@@ -39,8 +37,7 @@ def plot_vertices(vertices, radius,  ax):
         ax.add_artist(c)
 
 
-### Main Class ###
-class PathAdvisor:
+class VisibilityPathFinder:
     '''
     Description:
         Generate the reference path via the visibility graph and A* algorithm.
@@ -61,41 +58,16 @@ class PathAdvisor:
         find_closest_vertices   <get> - Find a set of closest vertices to a given point/position.
         plot_map                <vis> - Plot the map.
     '''
-    def __init__(self, inflate_margin=0, save_plot_path=None):
+    def __init__(self, graph_map):
         self.print_name = '[Path]'
-        self.inflator = pyclipper.PyclipperOffset()
-        self.inflate_margin = inflate_margin
-        if save_plot_path is not None:
-            self.env = PlottingEnvironment(plotting_dir=save_plot_path)
-        else: 
-            self.env = PolygonEnvironment()
+        self.graph = graph_map
 
-    def prepare(self, graph_map:object):
-        self.obstacle_list          = graph_map.obstacle_list.copy()
-        self.boundary_coordinates   = graph_map.boundary_coordinates.copy()
-        # Pre-proccess
-        self.processed_obstacle_list        = self.preprocess_obstacles( graph_map.obstacle_list, 
-                                                                         pyclipper.scale_to_clipper(self.inflate_margin) )
-        self.processed_boundary_coordinates = self.preprocess_obstacle( pyclipper.scale_to_clipper(graph_map.boundary_coordinates), 
-                                                                        pyclipper.scale_to_clipper(-self.inflate_margin) )
+        self.__prepare()
 
-        self.env.store(self.processed_boundary_coordinates, self.processed_obstacle_list) # pass obstacles and boundary to environment
+    def __prepare(self):
+        self.env = PolygonEnvironment()
+        self.env.store(self.graph.processed_boundary_coords, self.graph.processed_obstacle_list) # pass obstacles and boundary to environment
         self.env.prepare() # prepare the visibility graph 
-
-    def preprocess_obstacle(self, obstacle, inflation):
-        self.inflator.Clear()
-        self.inflator.AddPath(obstacle, pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
-        inflated_obstacle = pyclipper.scale_from_clipper(self.inflator.Execute(inflation))[0]
-        return inflated_obstacle    
-    
-    def preprocess_obstacles(self, obstacle_list, inflation):
-        inflated_obstacles = []
-        for obs in obstacle_list:
-            obstacle = pyclipper.scale_to_clipper(obs)
-            inflated_obstacle = self.preprocess_obstacle(obstacle, inflation)
-            inflated_obstacle.reverse() # obstacles are ordered clockwise
-            inflated_obstacles.append(inflated_obstacle)
-        return inflated_obstacles
 
     def get_ref_path(self, start_pos, end_pos):
         '''
@@ -109,15 +81,11 @@ class PathAdvisor:
             Vertices <list of tuples> - List of the vertices on the original (unpadded) obstacles corresponding to the vertices in path.
         '''
         self.path, dist = self.env.find_shortest_path(start_pos[:2], end_pos[:2]) # 'dist' are distances of every segments.
-        self.vertices       = self.find_original_vertices(self.path)
+        self.vertices   = self.find_original_vertices(self.path)
         return self.path, self.vertices
-
-    @staticmethod
-    def dist_between_points(p1, p2):
-        return math.hypot(p1[0]-p2[0], p1[1]-p2[1])
     
     def get_closest_vert(self, vert, point_list):
-        distances = [self.dist_between_points(vert, x) for x in point_list]
+        distances = [math.hypot(vert[0]-x[0], vert[1]-x[1]) for x in point_list]
         best_idx = distances.index(min(distances))
         return point_list[best_idx], best_idx
         
@@ -133,19 +101,11 @@ class PathAdvisor:
             vertices.append(closest_vert)
         return vertices
     
-    def find_closest_vertices(self, current_pos, n_vertices=10, N_STEPS_LOOK_BACK=2):
-        if n_vertices >= len(self.vertices):
-            return self.vertices
-        _, idx = self.get_closest_vert(current_pos, self.vertices)
-        lb = max(0, idx - N_STEPS_LOOK_BACK) # look two objects behind 
-        ub = min(len(self.vertices), n_vertices - N_STEPS_LOOK_BACK)
-        return self.vertices[lb:ub]
-
     def plot_map(self, ax, vert_radius=1):
-        plot_boundaries(self.boundary_coordinates,           ax=ax, color='k', label='Original Boundary')
-        plot_boundaries(self.processed_boundary_coordinates, ax=ax, color='g', label='Padded Boundary')
-        plot_obstacles( self.obstacle_list,                  ax=ax, color='r', label='Original Obstacles')
-        plot_obstacles( self.processed_obstacle_list,        ax=ax, color='y', label='Padded Obstacles')
+        plot_boundaries(self.graph.boundary_coordinates,           ax=ax, color='k', label='Original Boundary')
+        plot_boundaries(self.graph.processed_boundary_coordinates, ax=ax, color='g', label='Padded Boundary')
+        plot_obstacles( self.graph.obstacle_list,                  ax=ax, color='r', label='Original Obstacles')
+        plot_obstacles( self.graph.processed_obstacle_list,        ax=ax, color='y', label='Padded Obstacles')
         
         plot_path(self.path, ax=ax, color='--k')
         plot_vertices(self.vertices, radius=vert_radius, ax=ax)

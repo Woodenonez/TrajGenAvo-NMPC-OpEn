@@ -36,8 +36,6 @@ required_config_params = {
     'ns': 'Number of states for the robot (x,y,theta)',
     'nu': 'Number of control inputs (linear and angular speeds)',
     'nq': 'Number of penlty parameters',
-    'nobs': 'Number of variables per obstacles',
-    'Nobs': 'Maximal number of obstacles',
     'ndynobs': 'Number of variables per dynamic obstacle',
     'Ndynobs': 'Maximal number of dynamic obstacles',
     # Building options in the optimizer
@@ -56,9 +54,9 @@ class dotdict(dict):
 
 class Configurator:
     def __init__(self, yaml_fp):
-        self.print_name = '[CONFIG]'
+        self.prtname = '[CONFIG]'
         self.fp = yaml_fp
-        print(f"{self.print_name} Loading configuration from '{self.fp}'.")
+        print(f'{self.prtname} Loading configuration from "{self.fp}".')
         with open(self.fp, 'r') as stream:
             self.input = yaml.safe_load(stream)
         self.args = dotdict()
@@ -66,13 +64,12 @@ class Configurator:
     def configurate_key(self, key):
         value = self.input.get(key)
         if value is None:
-            print(f"{self.print_name} Can not find '{key}' in the YAML-file. Explanation is: '{required_config_params[key]}'.")
-            raise RuntimeError('{self.print_name} Configuration is not properly set.')
+            print(f"{self.prtname} Can not find '{key}' in the YAML-file. Explanation is: '{required_config_params[key]}'.")
+            raise RuntimeError(f'{self.prtname} Configuration is not properly set.')
         self.args[key] = value
 
     def configurate(self):
-        print(f'{self.print_name} STARTING CONFIGURATION...')
         for key in required_config_params:
             self.configurate_key(key)
-        print(f'{self.print_name} CONFIGURATION FINISHED SUCCESSFULLY...')
+        print(f'{self.prtname} Configuration done.')
         return self.args

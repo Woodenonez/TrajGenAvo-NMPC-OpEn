@@ -136,8 +136,7 @@ class MpcModule:
                                     (rv, rw are penalties for input)
                                 2. Reference path (dim of states * N_hor)
                                 3. Speed reference in each step (N_hor)
-                                4. Static obstacles  (#obs * dim of obs_params)
-                                5. Dynamic obstacles (#obs * dim of obs_params * N_hor)
+                                4. Dynamic obstacles (#obs * dim of obs_params * N_hor)
             Reference: Ellipse definition - [https://math.stackexchange.com/questions/426150/what-is-the-general-equation-of-the-ellipse-that-is-not-in-the-origin-and-rotate]
         '''
         print(f'{self.print_name} Building MPC module...')
@@ -148,8 +147,7 @@ class MpcModule:
         q = cs.SX.sym('q', self.config.nq)                      # 1. Penalty parameters
         r = cs.SX.sym('r', self.config.ns*self.config.N_hor     # 2. Reference path
                          + self.config.N_hor)                   # 3. Speed reference in each step
-        o = cs.SX.sym('o', self.config.Nobs*self.config.nobs    # 4. Static obstacles
-                         + self.config.Ndynobs*self.config.ndynobs*self.config.N_hor) # 5. Dynamic obstacles
+        o = cs.SX.sym('o', self.config.Ndynobs*self.config.ndynobs*self.config.N_hor) # 4. Dynamic obstacles
         z = cs.vertcat(s,q,r,o)
         
         (x, y, theta, v_init, w_init, x_goal, y_goal, theta_goal) = (s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
@@ -166,24 +164,18 @@ class MpcModule:
             x += self.config.ts * (u_t[0] * cs.cos(theta))
             y += self.config.ts * (u_t[0] * cs.sin(theta))
             theta += self.config.ts * u_t[1]
-            
-            # Static obstacles
-            x_stc = o[0:self.config.Nobs*self.config.nobs:self.config.nobs]
-            y_stc = o[1:self.config.Nobs*self.config.nobs:self.config.nobs]
-            r_stc = o[2:self.config.Nobs*self.config.nobs:self.config.nobs]
 
             # Dynamic obstacles
             # (x, y, rx, ry, tilted_angle) for obstacle 0 for N_hor steps, then (x, y, rx, ry, tilted_angle) for obstalce 1 for N_hor steps...
-            x_dyn  = o[self.config.Nobs*self.config.nobs+t*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
-            y_dyn  = o[self.config.Nobs*self.config.nobs+t*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
-            rx_dyn = o[self.config.Nobs*self.config.nobs+t*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
-            ry_dyn = o[self.config.Nobs*self.config.nobs+t*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
-            As     = o[self.config.Nobs*self.config.nobs+t*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
+            x_dyn  = o[t*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
+            y_dyn  = o[t*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
+            rx_dyn = o[t*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
+            ry_dyn = o[t*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
+            As     = o[t*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
 
             # ellipse center - x_dyn, y_dyn;  radii - rx_dyn, ry_dyn;  angles of ellipses (positive from x axis) - As
-            distance_inside_circle = r_stc**2 - (x-x_stc)**2 - (y-y_stc)**2 # positive if inside the circular obstacle
             distance_inside_ellipse = 1 - ((x-x_dyn)*cs.cos(As)+(y-y_dyn)*cs.sin(As))**2/(rx_dyn**2) - ((x-x_dyn)*cs.sin(As)-(y-y_dyn)*cs.cos(As))**2/(ry_dyn)**2
-            obstacle_constraints += cs.fmax(0, cs.vertcat(distance_inside_circle, distance_inside_ellipse))
+            obstacle_constraints += cs.fmax(0, distance_inside_ellipse)
 
             # Initialize list with CTE to all line segments
             current_p = cs.vertcat(x,y)
@@ -276,7 +268,4 @@ class MpcModule:
         
         return exit_status, solver_time
 
-    def plot_action(self, ax, action): # velocity or angular velocity
-        time = np.linspace(0, self.config.ts*(len(action)), len(action))
-        ax.plot(time, action, '-o', markersize = 4, linewidth=2)
 

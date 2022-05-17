@@ -2,7 +2,8 @@
 from typing import Union, Tuple, List
 
 '''
-This is a dummy class
+
+
 '''
 
 class GloablPathPlanner:

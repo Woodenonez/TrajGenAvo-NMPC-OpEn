@@ -7,10 +7,10 @@ import pandas as pd
 import cv2
 
 try:
-    from utils.utils import *
+    from utils.utils_sl import *
 except:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-    from utils.utils import *
+    from utils.utils_sl import *
 
 
 '''

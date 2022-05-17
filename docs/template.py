@@ -5,7 +5,6 @@ import os
 
 '''
 File info:
-    Name    - [XXX]
     Author  - [XXX]
     Date    - (from)[XXX] -> (to)[XXX]
     Ref     - (literature)[XXX]
@@ -13,7 +12,7 @@ File info:
     Exe     - (executable)[Yes]
 File description:
     (What does this file do?)
-File content:
+File content (important ones):
     ClassA      <class> - (Basic usage).
     ClassB      <class> - (Basic usage).
     function_A  <func>  - (Basic usage).
@@ -22,7 +21,7 @@ Comments:
     (Things worthy of attention.)
 '''
 
-def function_A(x:int, y:int):
+def function_A(x:int, y:int) -> int:
     '''
     Description:
         (What does this function do?)
@@ -44,13 +43,13 @@ class ClassA():
     '''
     Description:
         (What does this class do?)
-    Arguments:
+    Arguments (in init):
         x <type> - (Description).
         y <type> - (Description).
-    Attributes:
+    Attributes (important ones):
         attr1 <type> - (Description).
         attr2 <type> - (Description).
-    Functions
+    Functions (important ones):
         func1 <type> - (Description).
         func2 <type> - (Description).
     Comments:
@@ -70,4 +69,4 @@ class ClassB():
     pass
 
 if __name__ == '__main__':
-    do_something = True # this part for testing, if missing then 'Exe'=No
+    do_something = True # this part is for testing, if missing then 'Exe'=No
