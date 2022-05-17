@@ -108,17 +108,17 @@ class PathAdvisor:
             Path     <list of tuples> - List of coordinates of the inital path nodes, lying on extremities of the padded obstacles. 
             Vertices <list of tuples> - List of the vertices on the original (unpadded) obstacles corresponding to the vertices in path.
         '''
-        self.path, dist = self.env.find_shortest_path(start_pos, end_pos) # 'dist' are distances of every segments.
+        self.path, dist = self.env.find_shortest_path(start_pos[:2], end_pos[:2]) # 'dist' are distances of every segments.
         self.vertices       = self.find_original_vertices(self.path)
         return self.path, self.vertices
 
     @staticmethod
     def dist_between_points(p1, p2):
-        return np.linalg.norm((np.asarray(p1)-np.asarray(p2)))
+        return math.hypot(p1[0]-p2[0], p1[1]-p2[1])
     
     def get_closest_vert(self, vert, point_list):
-        distances = map(lambda x: self.dist_between_points(vert, x), point_list)
-        best_idx = np.argmin(list(distances))
+        distances = [self.dist_between_points(vert, x) for x in point_list]
+        best_idx = distances.index(min(distances))
         return point_list[best_idx], best_idx
         
     def find_original_vertices(self, path):

@@ -1,6 +1,7 @@
-import os, sys, time, math
+import os, sys
+import time
+import math
 import itertools
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -12,11 +13,11 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-### Choose the right file for scanner and advisor
+### Choose the right file for scanner
 from obstacle_scanner.mmc_dynamic_obstacles import ObstacleScanner
-from path_advisor.visibility import PathAdvisor
 
 from mpc.mpc_generator import MpcModule
+from path_advisor.visibility import PathAdvisor
 
 '''
 File info:
@@ -46,7 +47,6 @@ class TrajectoryGenerator:
         print_name    <str>     - The name to print while running this class.
         config        <dotdict> - As above mentioned.
         time_dict     <dict>    - Keep all the computing time information.
-        ppp           <object>  - The path adviser offering the reference path.
         scanner       <object>  - The obstacle scanner offering the dynamic obstacle info.
         mpc_generator <object>  - The MPC module.
     Functions
@@ -67,8 +67,8 @@ class TrajectoryGenerator:
         self.solver_times = []
         self.overhead_times = []
 
-        self.ppp           = PathAdvisor(inflate_margin=self.config.vehicle_width, save_plot_path=None)
         self.scanner       = ObstacleScanner()
+        self.ppp           = PathAdvisor(inflate_margin=self.config.vehicle_width, save_plot_path=None)
         self.mpc_generator = MpcModule(self.config)
 
         if build:
@@ -236,12 +236,12 @@ class TrajectoryGenerator:
             
         plt.show()
 
-    def run(self, graph_map:object, start, end):
+    def run(self, ref_path:list, start, end):
         '''
         Description:
             Run the trajectory planner.
         Arguments:
-            graph_map <object> - A 'Graph' object for the path advisor.
+            ref_path  <list of tuple> - Reference path
             start     <list> - The start state [x, y, theta]
             end       <list> - The end state [x, y, theta]
         Return:
@@ -270,20 +270,8 @@ class TrajectoryGenerator:
         tt = time.time() # total time
 
         if self.vb:
-            print(f"{self.print_name} Initializing the path advisor...")
-        t_temp = time.time()
-        self.ppp.prepare(graph_map)
-        self.time_dict["launch_adviser"] = int(1000*(time.time()-t_temp))
-
-        if self.vb:
-            print(f"{self.print_name} Requesting the reference path...")
-        t_temp = time.time()
-        path, _ = self.ppp.get_ref_path( (start[0], start[1]), (end[0], end[1]) )
-        self.time_dict["get_refpath"] = int(1000*(time.time()-t_temp))
-
-        if self.vb:
             print(f"{self.print_name} Requesting the reference trajectory...")
-        x_ref, y_ref, theta_ref = self.mpc_generator.gen_ref_trajectory( (start[0], start[1]), path[1:] )
+        x_ref, y_ref, theta_ref = self.mpc_generator.gen_ref_trajectory( (start[0], start[1]), ref_path[1:] )
         self.time_dict["get_reftraj"] = int(1000*(time.time()-t_temp)) # including computing reference path
 
         if self.vb:

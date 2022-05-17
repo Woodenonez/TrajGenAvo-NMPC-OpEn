@@ -22,9 +22,7 @@ class Graph:
     Description:
         Define a map.
     Arguments:
-        start <tuple> - The start point in 2D coordinates.
-        end   <tuple> - The end point in 2D coordinates.
-        index <int>   - Not used for now.
+        None
     Attributes:
         boundary_coordinates <list of tuples> - Each tuple is a vectex of the boundary polygon.
                                               - Defined in counter-clockwise ordering.
@@ -33,17 +31,15 @@ class Graph:
     Functions
         plot_map <vis> - Visualization of the map. Plot directly.
     '''
-    def __init__(self, start, end, index=0):
+    def __init__(self):
         self.boundary_coordinates = [(0, 0), (16, 0), (16, 10), (0, 10)]  # in counter-clockwise ordering
         self.obstacle_list = [[(0, 1.5), (0, 1.6), (9, 1.6), (9, 1.5)],
                               [(0, 8.4), (0, 8.5), (9, 8.5), (9, 8.4)],
                               [(11, 1.5), (11, 1.6), (16, 1.6), (16, 1.5)],
                               [(11, 8.4), (11, 8.5), (16, 8.5), (16, 8.4)]] # in clock-wise ordering
         self.crossing_area = [(9, 1.5), (11, 1.5), (11, 8.5), (9, 8.5)]
-        self.start = start
-        self.end = end
 
-    def plot_map(self):
+    def plot_map(self, start=None, end=None):
         boundary = self.boundary_coordinates + [self.boundary_coordinates[0]]
         boundary = np.array(boundary)
         _, ax = plt.subplots()
@@ -60,8 +56,10 @@ class Graph:
             obs = np.array(obs)
             poly = patches.Polygon(obs, color='k')
             ax.add_patch(poly)
-        plt.plot(self.start[0], self.start[1], 'b*')
-        plt.plot(self.end[0], self.end[1], 'r*')
+        if start is not None:
+            plt.plot(self.start[0], self.start[1], 'b*')
+        if end is not None:
+            plt.plot(self.end[0], self.end[1], 'r*')
         plt.show()
 
 if __name__ == '__main__':
