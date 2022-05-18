@@ -41,6 +41,7 @@ init_build = False
 show_animation = True
 save_animation = False
 plot_prediction = True
+
 start = (0.6, 3.3, math.radians(0)) # this should be detected/calculated in real scenes
 
 ### Load configuration

@@ -1,7 +1,7 @@
-import os, math, time
+import os
+import math, time
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 import opengen as og
 import casadi.casadi as cs

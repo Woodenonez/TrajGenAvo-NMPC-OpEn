@@ -22,6 +22,8 @@ Comments:
     [GPP] --global path & static obstacles--> [LPP] --refernece path & tube width--> [TG(Config)] <--dynamic obstacles-- [OS]
 '''
 
+MAX_RUNNING_TIME_MS = 500_000 # ms
+
 class TrajectoryGenerator:
     '''
     Description:
@@ -59,6 +61,26 @@ class TrajectoryGenerator:
         built_solver = __import__(self.config.optimizer_name)
         self.solver = built_solver.solver()
 
+    def load_tunning_parameter(self, robot_flag=None):
+        nparams = 10
+        if robot_flag is None:
+            parameter_list = [self.config.qp, self.config.qv, self.config.qtheta, self.config.lin_vel_penalty, self.config.ang_vel_penalty,
+                              self.config.qpN, self.config.qthetaN, self.config.qcte, self.config.lin_acc_penalty, self.config.ang_acc_penalty]
+        elif robot_flag=='aligning':
+            parameter_list = [0.0] * nparams
+            parameter_list[2] = 100
+        else:
+            raise ModuleNotFoundError(f'No state called {robot_flag}.')
+        return parameter_list
+
+    def termination_condition(self, states, final_goal, system_input) -> bool:
+        if np.allclose(states[-3:-1], final_goal[0:2], atol=0.05, rtol=0) and abs(system_input[-2]) < 0.005:
+            terminated = True
+            print(f"{self.__prtname} MPC solution found.")
+        else:
+            terminated = False
+        return terminated
+
     def run(self, ref_path:list, start:list, end:list):
         '''
         Description:
@@ -72,20 +94,12 @@ class TrajectoryGenerator:
             xy             <list> - List of y coordinate.
             uv             <list> - List of velocity input.
             uomega         <list> - List of angular velocity input.
-        Comments:
-            'x_init'    <list>          [x, y, theta]
-            'x_finish'  <list>          [x, y, theta]
         '''
-        # Initialize tuning parameters to be passed to solver
-        parameter_list = [self.config.qp, self.config.qv, self.config.qtheta, self.config.lin_vel_penalty, self.config.ang_vel_penalty,
-                          self.config.qpN, self.config.qthetaN, self.config.qcte, self.config.lin_acc_penalty, self.config.ang_acc_penalty]
-        # generate costs to establish initial heading
-        p_init_c = [0.0*i for i in parameter_list]
-        p_init_c[2] = np.max(parameter_list)
 
         x_ref, y_ref, theta_ref = self.mpc_generator.gen_ref_trajectory( (start[0], start[1]), ref_path[1:] )
 
         ### Prepare for the loop computing ###
+        ts                  = self.config.ts # sampling time
         N_hor               = self.config.N_hor # frequently used: control/prediction horizon
         params_per_dyn_obs  = N_hor*self.config.ndynobs
         base_speed          = self.config.lin_vel_max*self.config.throttle_ratio
@@ -96,30 +110,29 @@ class TrajectoryGenerator:
 
         # Initialize lists
         refs = [0.0] * (N_hor * self.config.ns)
-        # stc_constraints = [0.0] * self.config.Nobs*self.config.nobs
         dyn_constraints = [0.0] * self.config.Ndynobs * self.config.ndynobs*N_hor
         # Avoid dividing by zero in MPC solver by init x radius and y radius to 1
         dyn_constraints[2::self.config.ndynobs] = [1.0] * self.config.Ndynobs*N_hor
         dyn_constraints[3::self.config.ndynobs] = [1.0] * self.config.Ndynobs*N_hor
 
         ### Start the loop ###
-        t = 0   # time step, start from 0
+        kt = 0  # time step, start from 0 (kt*ts is the actual time)
         idx = 0 # index of the current reference trajectory point
-        terminal = False
+        terminated = False
         establish_heading = False
     
-        while (not terminal) and t < 500.0/self.config.ts:
-            x_init = states[-self.config.ns:] # set current state as initial state for solver
+        while (not terminated) and kt < MAX_RUNNING_TIME_MS/1000/ts:
+            x_cur = states[-self.config.ns:] # set current state as initial state for solver
 
-            if t == 0: # NOTE May vary for different types of obstacles
-                full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(t*self.config.ts), horizon=N_hor, ts=self.config.ts)
+            if kt == 0: # NOTE May vary for different types of obstacles
+                full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
                 for i, dyn_obstacle in enumerate(full_obstacle_list):
                     dyn_constraints[i*params_per_dyn_obs:(i+1)*params_per_dyn_obs] = list(itertools.chain(*dyn_obstacle))
             else: # Rotate list to the left
                 dyn_constraints = dyn_constraints[self.config.ndynobs*self.config.num_steps_taken:] + \
                                     dyn_constraints[:self.config.ndynobs*self.config.num_steps_taken]
-                current_time = (t+N_hor-self.config.num_steps_taken)*self.config.ts
-                full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=current_time, horizon=self.config.num_steps_taken, ts=self.config.ts)
+                current_time = (kt+N_hor-self.config.num_steps_taken)*ts
+                full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=current_time, horizon=self.config.num_steps_taken, ts=ts)
                 for i, dyn_obstacle in enumerate(full_obstacle_list):
                     # Update last num_steps taken dynobs positions
                     dyn_constraints[(i+1)*params_per_dyn_obs-self.config.ndynobs*self.config.num_steps_taken:(i+1)*params_per_dyn_obs] = list(
@@ -129,7 +142,7 @@ class TrajectoryGenerator:
             lb_idx = max(0, idx-1*self.config.num_steps_taken)                  # reduce search space for closest reference point
             ub_idx = min(len(ref_points), idx+5*self.config.num_steps_taken)    # reduce search space for closest reference point
 
-            distances = [math.hypot(x_init[0]-x[0], x_init[1]-x[1]) for x in ref_points[lb_idx:ub_idx]]
+            distances = [math.hypot(x_cur[0]-x[0], x_cur[1]-x[1]) for x in ref_points[lb_idx:ub_idx]]
             idx = distances.index(min(distances))
 
             idx += lb_idx  # idx in orignal reference trajectory list
@@ -159,16 +172,11 @@ class TrajectoryGenerator:
                 last_u = [0.0] * self.config.nu
 
             ### Assemble parameters for solver ###
-            if(not establish_heading):
-                params = x_init + last_u + x_finish + \
-                        parameter_list + \
-                        refs + vel_ref + \
-                        dyn_constraints
-            else:
-                params = x_init + last_u + x_finish + \
-                        p_init_c + \
-                        refs + vel_ref + \
-                        dyn_constraints
+            parameter_list = self.load_tunning_parameter(state=('aligning' if establish_heading else None))
+            params = x_cur + last_u + x_finish + \
+                     parameter_list + \
+                     refs + vel_ref + \
+                     dyn_constraints
 
             try:
                 exit_status, solver_time = self.mpc_generator.run(params, self.solver, self.config.num_steps_taken, system_input, states)
@@ -181,11 +189,10 @@ class TrajectoryGenerator:
             if exit_status in self.config.bad_exit_codes and self.vb:
                 print(f"{self.__prtname} Bad converge status: {exit_status}")
 
-            if np.allclose(states[-3:-1], end[0:2], atol=0.05, rtol=0) and abs(system_input[-2]) < 0.005:
-                terminal = True
-                print(f"{self.__prtname} MPC solution found.")
+            terminated = self.termination_condition(states, end, system_input)
+                
 
-            t += self.config.num_steps_taken
+            kt += self.config.num_steps_taken
 
         xx = states[0:len(states):self.config.ns]
         xy = states[1:len(states):self.config.ns]
