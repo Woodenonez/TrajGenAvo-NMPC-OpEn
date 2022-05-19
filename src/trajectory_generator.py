@@ -192,9 +192,9 @@ class TrajectoryGenerator:
             terminated = self.termination_condition(states, end, system_input)
             kt += self.config.num_steps_taken
 
-        xx = states[0:len(states):self.config.ns]
-        xy = states[1:len(states):self.config.ns]
-        uv = system_input[0:len(system_input):2]
+        xx     = states[0:len(states):self.config.ns]
+        xy     = states[1:len(states):self.config.ns]
+        uv     = system_input[0:len(system_input):2]
         uomega = system_input[1:len(system_input):2]
 
         return xx, xy, uv, uomega

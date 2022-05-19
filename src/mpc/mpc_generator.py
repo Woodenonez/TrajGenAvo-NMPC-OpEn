@@ -1,5 +1,4 @@
 import os
-import math
 
 import numpy as np
 
@@ -21,45 +20,6 @@ Comments:
 
 MAX_SOVLER_TIME = 500_000 # ms
 
-def dist_point_to_lineseg(point, line_segment):
-    '''
-    Arguments:
-        point        <ndarray>          - column vector
-        line_segment <list of ndarray>  - two points
-    Return:
-        distance <value>
-    Comments:
-        [Ref] https://math.stackexchange.com/questions/330269/the-distance-from-a-point-to-a-line-segment
-    '''
-    (p, s1, s2) = (point, line_segment[0], line_segment[1])
-    s2s1 = s2-s1 # line segment
-    t_hat = cs.dot(p-s1,s2s1)/(s2s1[0]**2+s2s1[1]**2+1e-16)
-    t_star = cs.fmin(cs.fmax(t_hat,0.0),1.0) # limit t
-    temp_vec = s1 + t_star*s2s1 - p # vector pointing to closest point
-    distance = np.sqrt(temp_vec[0]**2+temp_vec[1]**2)
-    return distance
-
-def cost_cte(point, line_segments:list, weight=1):
-    '''
-    Description:
-        [Cost] Cross-track-error, penalizes on the deviation from the reference path.
-    Arguments:
-        point         <ndarray>         - column vector
-        line_segments <list of ndarray> - from the the start point to the end point
-    Comments:
-        The 'line_segments' contains segments which are end-to-end.
-    '''
-    (p, p_ls) = (point, line_segments)
-    distances_sqrt = cs.SX.ones(1)
-    for i in range(len(p_ls)-1):
-        distance = dist_point_to_lineseg(p, [p_ls[i], p_ls[i+1]])
-        distances_sqrt = cs.horzcat(distances_sqrt, distance**2)
-    cost = cs.mmin(distances_sqrt[1:]) * weight
-    return cost
-
-def cost_vec_sqaure(vector, weight=1):
-    return np.sum(np.multiply(vector**2, weight))
-
 ### Main class ###
 class MpcModule:
     '''
@@ -80,50 +40,6 @@ class MpcModule:
         self.print_name = '[MPC]'
         self.config = config
 
-    def gen_ref_trajectory(self, current_position:tuple, node_list):
-        '''
-        Description:
-            Generate the reference trajectory from the reference path.
-        Arguments:
-            current_position <tuple>         - The x,y coordinates.
-            node_list        <list of tuple> - A list of reference path nodes.
-        Return:
-            x_ref       <list> - List of x coordinates  of the reference trajectory per time step. 
-            y_ref       <list> - List of y coordinates  of the reference trajectory per time step.
-            theta_ref   <list> - List of heading angles of the reference trajectory per time step.
-        '''
-        x,y = current_position
-        x_target, y_target = node_list[0]
-        v_ref = self.config.throttle_ratio * self.config.lin_vel_max # self.v_ref
-        
-        (x_ref, y_ref, theta_ref) = ([],[],[])
-        idx = 0
-        traveling = True
-        while(traveling):# for n in range(N):
-            t = self.config.ts
-            while(True):
-                x_dir = (x_target-x)/math.hypot(x_target-x,y_target-y)
-                y_dir = (y_target-y)/math.hypot(x_target-x,y_target-y)
-                dist = math.hypot(x_target-x,y_target-y)
-                time = dist/v_ref
-                if time > t: # move to the target node for t
-                    x,y = x+x_dir*v_ref*t, y+y_dir*v_ref*t 
-                    break # to append the position
-                else: # move to the target node then set a new target
-                    x,y = x+x_dir*v_ref*time, y+y_dir*v_ref*time
-                    t = t-time # update how much time you have left on the current time step
-                    idx = idx+1
-                    if idx > len(node_list)-1 :
-                        traveling = False
-                        break
-                    else:
-                        x_target, y_target = node_list[idx] # set a new target node
-            x_ref.append(x)
-            y_ref.append(y)
-            theta_ref.append(math.atan2(y_dir,x_dir))
-            
-        return x_ref, y_ref, theta_ref
-        
     def build(self):
         '''
         Description:
@@ -179,9 +95,8 @@ class MpcModule:
             obstacle_constraints += cs.fmax(0, distance_inside_ellipse)
 
             # Initialize list with CTE to all line segments
-            current_p = cs.vertcat(x,y)
             path_ref = [cs.vertcat(r[i*self.config.ns], r[i*self.config.ns+1]) for i in range(1, self.config.N_hor)]
-            cost += cost_cte(current_p, path_ref, weight=qCTE) # [cost] cross track error
+            cost += helper.cost_cte(cs.vertcat(x,y), path_ref, weight=qCTE) # [cost] cross track error
             cost += rv*u_t[0]**2 + rw*u_t[1]**2 # [cost] penalize control actions
             cost += qv*(u_t[0]-r[self.config.ns*self.config.N_hor+kt])**2 # [cost] deviation from refenrence velocity
             
@@ -189,7 +104,7 @@ class MpcModule:
 
         # Max speeds 
         umin = [self.config.lin_vel_min, -self.config.ang_vel_max] * self.config.N_hor
-        umax = [self.config.lin_vel_max, self.config.ang_vel_max] * self.config.N_hor
+        umax = [self.config.lin_vel_max,  self.config.ang_vel_max] * self.config.N_hor
         bounds = og.constraints.Rectangle(umin, umax)
 
         # Acceleration bounds and cost

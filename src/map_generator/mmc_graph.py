@@ -53,7 +53,7 @@ class Graph:
         self.inflation(inflate_margin=inflate_margin)
 
     def plot_map(self, ax, start=None, end=None):
-        boundary = np.array(self.boundary_coordinates + [self.boundary_coordinates[0]])
+        boundary = np.array(self.boundary_coords + [self.boundary_coords[0]])
         ax.plot(boundary[:,0], boundary[:,1], 'k')
         ax.plot([0, 16], [5, 5], c='orange', linestyle='--')
         ax.fill_between([0, 16], [1.6, 1.6], [8.4, 8.4], color='lightgray')
@@ -68,10 +68,10 @@ class Graph:
             poly = patches.Polygon(obs, color='k')
             ax.add_patch(poly)
         if start is not None:
-            plt.plot(self.start[0], self.start[1], 'b*')
+            ax.plot(self.start[0], self.start[1], 'b*')
         if end is not None:
-            plt.plot(self.end[0], self.end[1], 'r*')
-        plt.show()
+            ax.plot(self.end[0], self.end[1], 'r*')
+        ax.axis('equal')
 
     def inflation(self, inflate_margin):
         self.inflator = pyclipper.PyclipperOffset()
@@ -100,3 +100,4 @@ if __name__ == '__main__':
     end = (16, 3.3, math.radians(0))
     graph = Graph(start, end)
     graph.plot_map()
+    plt.show()
