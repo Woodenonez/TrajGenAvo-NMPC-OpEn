@@ -39,7 +39,7 @@ class TrajectoryGenerator:
         scanner       <object>  - The obstacle scanner offering the dynamic obstacle info.
         mpc_generator <object>  - The MPC module.
     Functions
-        run               <run>  - Run.
+        run <run>  - Run.
     Comments:
         Have fun but may need to modify the dynamic obstacle part (search NOTE).
     '''
@@ -96,7 +96,7 @@ class TrajectoryGenerator:
             uomega         <list> - List of angular velocity input.
         '''
 
-        x_ref, y_ref, theta_ref = self.mpc_generator.gen_ref_trajectory( (start[0], start[1]), ref_path[1:] )
+        x_ref, y_ref, theta_ref = np.array(ref_path)[:,0].tolist(), np.array(ref_path)[:,1].tolist(), np.array(ref_path)[:,2].tolist()
 
         ### Prepare for the loop computing ###
         ts                  = self.config.ts # sampling time
@@ -172,7 +172,7 @@ class TrajectoryGenerator:
                 last_u = [0.0] * self.config.nu
 
             ### Assemble parameters for solver ###
-            parameter_list = self.load_tunning_parameter(state=('aligning' if establish_heading else None))
+            parameter_list = self.load_tunning_parameter(robot_flag=('aligning' if establish_heading else None))
             params = x_cur + last_u + x_finish + \
                      parameter_list + \
                      refs + vel_ref + \
@@ -190,8 +190,6 @@ class TrajectoryGenerator:
                 print(f"{self.__prtname} Bad converge status: {exit_status}")
 
             terminated = self.termination_condition(states, end, system_input)
-                
-
             kt += self.config.num_steps_taken
 
         xx = states[0:len(states):self.config.ns]

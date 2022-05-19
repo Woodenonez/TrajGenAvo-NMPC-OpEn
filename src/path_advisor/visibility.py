@@ -69,7 +69,7 @@ class VisibilityPathFinder:
         self.env.store(self.graph.processed_boundary_coords, self.graph.processed_obstacle_list) # pass obstacles and boundary to environment
         self.env.prepare() # prepare the visibility graph 
 
-    def get_ref_path(self, start_pos, end_pos):
+    def get_ref_path_node(self, start_pos, end_pos):
         '''
         Description:
             Generate the initially guessed path based on obstacles and boundaries specified during preparation.

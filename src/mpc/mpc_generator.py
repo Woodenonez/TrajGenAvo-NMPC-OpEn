@@ -1,10 +1,12 @@
 import os
-import math, time
+import math
 
 import numpy as np
 
 import opengen as og
 import casadi.casadi as cs
+
+from mpc import mpc_helper as helper
 
 '''
 File info:
@@ -129,7 +131,7 @@ class MpcModule:
         Conmments:
             Horizon: N_hor
             Inputs (u): speed, angular speed
-            states (s): x, y, theta
+            states (s): x, y, theta, e (e is the tube width / allowable error)
             Constraints (z):    1. Initialization, states, and parameters (0~17) ->
                                     x, y, theta, v0, w0; x_goal, y_goal, theta_goal;
                                     qp, qv, qtheta, rv, rw; qN, qthetaN, qCTE, acc_penalty, omega_acc_penalty
@@ -156,22 +158,21 @@ class MpcModule:
         cost = 0
         obstacle_constraints = 0
 
-        for t in range(0, self.config.N_hor): # LOOP OVER TIME STEPS
+        for kt in range(0, self.config.N_hor): # LOOP OVER TIME STEPS
             
-            u_t = u[t*self.config.nu:(t+1)*self.config.nu]  # inputs at time t
+            u_t = u[kt*self.config.nu:(kt+1)*self.config.nu]  # inputs at time t
             
             # Kinematic model
-            x += self.config.ts * (u_t[0] * cs.cos(theta))
-            y += self.config.ts * (u_t[0] * cs.sin(theta))
-            theta += self.config.ts * u_t[1]
+            state_next = helper.dynamics_rk4(self.config.ts, cs.vcat([x,y,theta]), u_t)
+            x, y, theta = state_next[0], state_next[1], state_next[2]
 
             # Dynamic obstacles
             # (x, y, rx, ry, tilted_angle) for obstacle 0 for N_hor steps, then (x, y, rx, ry, tilted_angle) for obstalce 1 for N_hor steps...
-            x_dyn  = o[t*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
-            y_dyn  = o[t*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
-            rx_dyn = o[t*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
-            ry_dyn = o[t*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
-            As     = o[t*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
+            x_dyn  = o[kt*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
+            y_dyn  = o[kt*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
+            rx_dyn = o[kt*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
+            ry_dyn = o[kt*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
+            As     = o[kt*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
 
             # ellipse center - x_dyn, y_dyn;  radii - rx_dyn, ry_dyn;  angles of ellipses (positive from x axis) - As
             distance_inside_ellipse = 1 - ((x-x_dyn)*cs.cos(As)+(y-y_dyn)*cs.sin(As))**2/(rx_dyn**2) - ((x-x_dyn)*cs.sin(As)-(y-y_dyn)*cs.cos(As))**2/(ry_dyn)**2
@@ -182,7 +183,7 @@ class MpcModule:
             path_ref = [cs.vertcat(r[i*self.config.ns], r[i*self.config.ns+1]) for i in range(1, self.config.N_hor)]
             cost += cost_cte(current_p, path_ref, weight=qCTE) # [cost] cross track error
             cost += rv*u_t[0]**2 + rw*u_t[1]**2 # [cost] penalize control actions
-            cost += qv*(u_t[0]-r[self.config.ns*self.config.N_hor+t])**2 # [cost] deviation from refenrence velocity
+            cost += qv*(u_t[0]-r[self.config.ns*self.config.N_hor+kt])**2 # [cost] deviation from refenrence velocity
             
         cost += qN*((x-x_goal)**2 + (y-y_goal)**2) + qthetaN*(theta-theta_goal)**2 # terminated cost
 
@@ -253,18 +254,9 @@ class MpcModule:
         solver_time = solution.solve_time_ms
         
         system_input += u[:self.config.nu*take_steps]
-
         for i in range(take_steps):
-            u_v = u[i*self.config.nu]
-            u_omega = u[1+i*self.config.nu]
-            
-            x = states[-3]
-            y = states[-2]
-            theta = states[-1]
-
-            states += [x + self.config.ts * (u_v * math.cos(theta)), # XXX
-                       y + self.config.ts * (u_v * math.sin(theta)), 
-                       theta + self.config.ts*u_omega]
+            state_next = helper.dynamics_rk4(self.config.ts, states[-3:], u[(i*self.config.nu):(2+i*self.config.nu)])
+            states += np.array(state_next).reshape(-1,).tolist()
         
         return exit_status, solver_time
 

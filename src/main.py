@@ -54,18 +54,19 @@ graph = Graph(inflate_margin=config.vehicle_width)
 
 ### Global path
 gpp = GloablPathPlanner(external_path=[(15.4, 3.3, math.radians(0))])
-gpp.set_start_point(start)
+gpp.set_start_point(start) # must set the start point
 
 start = gpp.start
 end   = gpp.final_goal # special case
 
 ### Local path
 lpp = LocalPathPlanner(graph)
-path = lpp.get_ref_path(start, end)
+path_node = lpp.get_ref_path_node(start, end)
+ref_path = lpp.get_detailed_path(config.ts, config.throttle_ratio * config.lin_vel_max, start[:2], path_node)
 
 ### Start & run MPC
-traj_gen = TrajectoryGenerator(config, build=init_build)
-xx,xy,uv,uomega = traj_gen.run(path, list(start), list(end))
+traj_gen = TrajectoryGenerator(config, build=init_build, verbose=True)
+xx,xy,uv,uomega = traj_gen.run(ref_path, list(start), list(end))
 
 ### Plot results (press any key to continue in dynamic mode if stuck)
 scanner = ObstacleScanner()
