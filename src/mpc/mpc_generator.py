@@ -69,10 +69,10 @@ class MpcModule:
         z = cs.vertcat(s,q,r,o)
         
         (x, y, theta, v_init, w_init, x_goal, y_goal, theta_goal) = (s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
-        (qp, qv, qtheta, rv, rw, qN, qthetaN, qCTE, acc_penalty, w_acc_penalty) = (q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9])
+        (qpos, qvel, qtheta, rv, rw, qN, qthetaN, qCTE, acc_penalty, w_acc_penalty) = (q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9])
         
         cost = 0
-        obstacle_constraints = 0
+        penalty_constraints = 0
 
         for kt in range(0, self.config.N_hor): # LOOP OVER TIME STEPS
             
@@ -83,22 +83,23 @@ class MpcModule:
             x, y, theta = state_next[0], state_next[1], state_next[2]
 
             # Dynamic obstacles
-            # (x, y, rx, ry, tilted_angle) for obstacle 0 for N_hor steps, then (x, y, rx, ry, tilted_angle) for obstalce 1 for N_hor steps...
-            x_dyn  = o[kt*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
-            y_dyn  = o[kt*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
-            rx_dyn = o[kt*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
-            ry_dyn = o[kt*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
-            As     = o[kt*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
+            # (alpha, x, y, rx, ry, tilted_angle) for obstacle 0 for N_hor steps, then (x, y, rx, ry, tilted_angle) for obstalce 1 for N_hor steps...
+            x_dyn     = o[kt*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
+            y_dyn     = o[kt*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
+            rx_dyn    = o[kt*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
+            ry_dyn    = o[kt*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
+            As        = o[kt*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
+            alpha_dyn = o[kt*self.config.ndynobs+5::self.config.ndynobs*self.config.N_hor]
 
             # ellipse center - x_dyn, y_dyn;  radii - rx_dyn, ry_dyn;  angles of ellipses (positive from x axis) - As
-            distance_inside_ellipse = 1 - ((x-x_dyn)*cs.cos(As)+(y-y_dyn)*cs.sin(As))**2/(rx_dyn**2) - ((x-x_dyn)*cs.sin(As)-(y-y_dyn)*cs.cos(As))**2/(ry_dyn)**2
-            obstacle_constraints += cs.fmax(0, distance_inside_ellipse)
+            # penalty_constraints += cs.fmax(0, helper.inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As]))
+            cost += helper.cost_inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As, alpha_dyn], narrowness=5, weight=10)
 
             # Initialize list with CTE to all line segments
             path_ref = [cs.vertcat(r[i*self.config.ns], r[i*self.config.ns+1]) for i in range(1, self.config.N_hor)]
             cost += helper.cost_cte(cs.vertcat(x,y), path_ref, weight=qCTE) # [cost] cross track error
             cost += rv*u_t[0]**2 + rw*u_t[1]**2 # [cost] penalize control actions
-            cost += qv*(u_t[0]-r[self.config.ns*self.config.N_hor+kt])**2 # [cost] deviation from refenrence velocity
+            cost += qvel*(u_t[0]-r[self.config.ns*self.config.N_hor+kt])**2 # [cost] deviation from refenrence velocity
             
         cost += qN*((x-x_goal)**2 + (y-y_goal)**2) + qthetaN*(theta-theta_goal)**2 # terminated cost
 
@@ -124,15 +125,15 @@ class MpcModule:
         cost += cs.mtimes(w_acc.T, w_acc)*w_acc_penalty
 
         problem = og.builder.Problem(u, z, cost) \
-            .with_penalty_constraints(obstacle_constraints) \
             .with_constraints(bounds) \
             .with_aug_lagrangian_constraints(acc_constraints, acc_bounds)
+        if penalty_constraints is not 0:
+            problem.with_penalty_constraints(penalty_constraints)
 
         build_config = og.config.BuildConfiguration() \
             .with_build_directory(self.config.build_directory) \
             .with_build_mode(self.config.build_type)
         build_config.with_build_python_bindings()
-        # build_config.with_tcp_interface_config()
 
         meta = og.config.OptimizerMeta() \
             .with_optimizer_name(self.config.optimizer_name)
@@ -167,12 +168,19 @@ class MpcModule:
         u = solution.solution
         exit_status = solution.exit_status
         solver_time = solution.solve_time_ms
+        cost = solution.cost
         
         system_input += u[:self.config.nu*take_steps]
         for i in range(take_steps):
-            state_next = helper.dynamics_rk4(self.config.ts, states[-3:], u[(i*self.config.nu):(2+i*self.config.nu)])
+            state_next = helper.dynamics_rk4(self.config.ts, states[-self.config.ns:], u[(i*self.config.nu):(2+i*self.config.nu)])
             states += np.array(state_next).reshape(-1,).tolist()
+
+        pred_states = states[-self.config.ns:]
+        for i in range(len(u)//self.config.nu):
+            state_next = helper.dynamics_rk4(self.config.ts, pred_states[-self.config.ns:], u[(i*self.config.nu):(2+i*self.config.nu)])
+            pred_states += np.array(state_next).reshape(-1,).tolist()
+        pred_states = pred_states[self.config.ns:]
         
-        return exit_status, solver_time
+        return exit_status, solver_time, cost, pred_states
 
 

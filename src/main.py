@@ -26,8 +26,8 @@ Comments:
     TG  - TrajGenrator; 
     OS  - ObstacleScanner; 
     MPC - MpcModule
-                                                                                      V [MPC] V
-    [GPP] --global path & static obstacles--> [LPP] --refernece path & tube width--> [TG(Config)] <--dynamic obstacles-- [OS]
+                                                                                        V [MPC] V
+    [GPP] --global path & static obstacles--> [LPP] --refernece path & tunnel width--> [TG(Config)] <--dynamic obstacles-- [OS]
     GPP is assumed given, which takes info of the "map" and "static obstacles" and controller by a [Scheduler].
 Branches:
     [main]: Using TCP/IP interface
@@ -37,7 +37,8 @@ Branches:
 
 ### Customize
 config_fn = 'default.yaml'
-init_build = True
+init_build = False
+plot_in_loop = True
 show_animation = False
 save_animation = False
 
@@ -61,12 +62,12 @@ end   = gpp.final_goal # special case
 ### Local path
 lpp = LocalPathPlanner(graph)
 path_node = lpp.get_ref_path_node(start, end)
-ref_path  = lpp.get_detailed_path(config.ts, config.throttle_ratio * config.lin_vel_max, start[:2], path_node)
+ref_path  = lpp.get_detailed_path(config.ts, config.high_speed * config.lin_vel_max, start[:2], path_node)
 
 ### Start & run MPC
-traj_gen = TrajectoryGenerator(config, build=init_build, verbose=False)
-xx, xy, uv, uomega = traj_gen.run(ref_path, list(start), list(end))
+traj_gen = TrajectoryGenerator(config, build=init_build, verbose=True)
+xx, xy, uv, uomega, cost_list = traj_gen.run(ref_path, list(start), list(end), plot_in_loop=plot_in_loop)
 
 ### Plot results (press any key to continue in dynamic mode if stuck)
 scanner = ObstacleScanner()
-util_plot.plot_results(graph, config.ts, xx, xy, uv, uomega, start, end, animation=show_animation, scanner=scanner, video=save_animation)
+util_plot.plot_results(graph, config.ts, xx, xy, uv, uomega, cost_list, start, end, animation=show_animation, scanner=scanner, video=save_animation)

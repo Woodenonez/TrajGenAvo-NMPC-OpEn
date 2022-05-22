@@ -8,6 +8,12 @@ import opengen as og
 from obstacle_scanner.mmc_dynamic_obstacles import ObstacleScanner ### choose the right scanner
 from mpc.mpc_generator import MpcModule
 
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+from matplotlib.lines import Line2D
+import matplotlib.patches as patches
+from map_generator.mmc_graph import Graph # choose the correct file
+
 '''
 File info:
     Ref     - [Trajectory generation for mobile robotsin a dynamic environment using nonlinear model predictive control, CASE2021]
@@ -22,7 +28,7 @@ Comments:
     [GPP] --global path & static obstacles--> [LPP] --refernece path & tube width--> [TG(Config)] <--dynamic obstacles-- [OS]
 '''
 
-MAX_RUNNING_TIME_MS = 500_000 # ms
+MAX_RUNNING_TIME_MS = 100_000 # ms
 
 class TrajectoryGenerator:
     '''
@@ -64,7 +70,7 @@ class TrajectoryGenerator:
     def load_tunning_parameter(self, robot_flag=None):
         nparams = 10
         if robot_flag is None:
-            parameter_list = [self.config.qp, self.config.qv, self.config.qtheta, self.config.lin_vel_penalty, self.config.ang_vel_penalty,
+            parameter_list = [self.config.qpos, self.config.qvel, self.config.qtheta, self.config.lin_vel_penalty, self.config.ang_vel_penalty,
                               self.config.qpN, self.config.qthetaN, self.config.qcte, self.config.lin_acc_penalty, self.config.ang_acc_penalty]
         elif robot_flag=='aligning':
             parameter_list = [0.0] * nparams
@@ -74,14 +80,14 @@ class TrajectoryGenerator:
         return parameter_list
 
     def termination_condition(self, states, final_goal, system_input) -> bool:
-        if np.allclose(states[-3:-1], final_goal[0:2], atol=0.05, rtol=0) and abs(system_input[-2]) < 0.005:
+        if np.allclose(states[-3:-1], final_goal[0:2], atol=0.05, rtol=0) and abs(system_input[-2]) < 0.05:
             terminated = True
             print(f"{self.__prtname} MPC solution found.")
         else:
             terminated = False
         return terminated
 
-    def run(self, ref_path:list, start:list, end:list):
+    def run(self, ref_path:list, start:list, end:list, plot_in_loop=False):
         '''
         Description:
             Run the trajectory planner.
@@ -102,7 +108,7 @@ class TrajectoryGenerator:
         ts                  = self.config.ts # sampling time
         N_hor               = self.config.N_hor # frequently used: control/prediction horizon
         params_per_dyn_obs  = N_hor*self.config.ndynobs
-        base_speed          = self.config.lin_vel_max*self.config.throttle_ratio
+        base_speed          = self.config.lin_vel_max*self.config.high_speed
         
         system_input = [] # initalize list with selected system inputs/velocities
         states = start.copy() # initialiize states as starting state
@@ -120,10 +126,47 @@ class TrajectoryGenerator:
         idx = 0 # index of the current reference trajectory point
         terminated = False
         establish_heading = False
-    
+        cost_list = []
+
+        ### Plot in loop XXX
+        if plot_in_loop:
+            fig = plt.figure(constrained_layout=True)
+            gs = GridSpec(3, 4, figure=fig)
+
+            vel_ax = fig.add_subplot(gs[0, :2])
+            vel_ax.set_xlabel('Time [s]')
+            vel_ax.set_ylabel('Velocity [m/s]')
+            vel_ax.grid('on')
+
+            omega_ax = fig.add_subplot(gs[1, :2])
+            omega_ax.set_xlabel('Time [s]')
+            omega_ax.set_ylabel('Angular velocity [rad/s]')
+            omega_ax.grid('on')
+
+            cost_ax = fig.add_subplot(gs[2, :2])
+            cost_ax.set_xlabel('Time [s]')
+            cost_ax.set_ylabel('Cost')
+            cost_ax.grid('on')
+
+            path_ax = fig.add_subplot(gs[:, 2:])
+            graph = Graph(self.config.vehicle_width)
+            path_ax.plot(start[0], start[1], marker='*', color='g', markersize=15, label='Start')
+            path_ax.plot(end[0], end[1], marker='*', color='r', markersize=15, label='End')
+            path_ax.arrow(start[0], start[1], math.cos(start[2]), math.sin(start[2]), head_width=0.05, head_length=0.1, fc='k', ec='k')
+            path_ax.set_xlabel('X [m]', fontsize=15)
+            path_ax.set_ylabel('Y [m]', fontsize=15)
+            path_ax.axis('equal')
+        ### Plot in loop
+
         while (not terminated) and kt < MAX_RUNNING_TIME_MS/1000/ts:
             x_cur = states[-self.config.ns:] # set current state as initial state for solver
 
+            ### full_obstacle_list = [[(x, y, rx ,ry, angle, alpha),(),...],[(),(),...]] each sub-list is a mode/obstacle
+            # full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
+            # for i, dyn_obstacle in enumerate(full_obstacle_list):
+            #     dyn_constraints[i*params_per_dyn_obs:(i+1)*params_per_dyn_obs] = list(itertools.chain(*dyn_obstacle))
+
+            ### XXX
             if kt == 0: # NOTE May vary for different types of obstacles
                 full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
                 for i, dyn_obstacle in enumerate(full_obstacle_list):
@@ -131,12 +174,17 @@ class TrajectoryGenerator:
             else: # Rotate list to the left
                 dyn_constraints = dyn_constraints[self.config.ndynobs*self.config.num_steps_taken:] + \
                                     dyn_constraints[:self.config.ndynobs*self.config.num_steps_taken]
-                current_time = (kt+N_hor-self.config.num_steps_taken)*ts
+                current_time = (kt+N_hor-self.config.num_steps_taken)*self.config.ts
                 full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=current_time, horizon=self.config.num_steps_taken, ts=ts)
                 for i, dyn_obstacle in enumerate(full_obstacle_list):
                     # Update last num_steps taken dynobs positions
                     dyn_constraints[(i+1)*params_per_dyn_obs-self.config.ndynobs*self.config.num_steps_taken:(i+1)*params_per_dyn_obs] = list(
                         itertools.chain(*dyn_obstacle))
+            ### XXX
+
+            print(len(full_obstacle_list), len(full_obstacle_list[0]), len(full_obstacle_list[1]))
+            print(dyn_obstacle)
+
 
             ### Get reference states ###
             lb_idx = max(0, idx-1*self.config.num_steps_taken)                  # reduce search space for closest reference point
@@ -161,7 +209,13 @@ class TrajectoryGenerator:
             refs[2::self.config.ns] = tmpt
 
             ### Get reference velocities ###
-            vel_ref = [base_speed]*self.config.N_hor
+            dist_to_goal = math.hypot(states[-3]-end[0], states[-2]-end[1])
+            if dist_to_goal >= base_speed*self.config.N_hor*self.config.ts:
+                vel_ref = [base_speed]*self.config.N_hor
+            else:
+                speed_ref = dist_to_goal / self.config.N_hor / self.config.ts
+                speed_ref = max(speed_ref, self.config.low_speed)
+                vel_ref = [speed_ref]*self.config.N_hor
 
             if establish_heading and abs(theta_ref[idx]-states[-1])<(math.pi/6): # if initial heading established
                 establish_heading = False
@@ -179,7 +233,8 @@ class TrajectoryGenerator:
                      dyn_constraints
 
             try:
-                exit_status, solver_time = self.mpc_generator.run(params, self.solver, self.config.num_steps_taken, system_input, states)
+                exit_status, solver_time, cost, pred_states = self.mpc_generator.run(params, self.solver, self.config.num_steps_taken, system_input, states)
+                cost_list.append(cost)
             except RuntimeError as err:
                 print("Fatal: Cannot run.")
                 if self.vb:
@@ -189,6 +244,37 @@ class TrajectoryGenerator:
             if exit_status in self.config.bad_exit_codes and self.vb:
                 print(f"{self.__prtname} Bad converge status: {exit_status}")
 
+            ### Plot in loop XXX
+            if plot_in_loop:
+                vel_ax.plot(kt*self.config.ts, system_input[-2], 'bo')
+                omega_ax.plot(kt*self.config.ts, system_input[-1], 'bo')
+                cost_ax.plot(kt*self.config.ts, cost, 'bo')
+
+                graph.plot_map(path_ax)
+                veh = plt.Circle((states[-3], states[-2]), self.config.vehicle_width/2, color='b', alpha=0.7, label='Robot')
+                path_ax.add_artist(veh)
+                path_ax.plot(states[-3], states[-2], 'b.')
+                pred_line = path_ax.plot(pred_states[::self.config.ns], pred_states[1::self.config.ns], 'm.')
+                remove_later = []
+                for obstacle_list in full_obstacle_list: # each "obstacle_list" has N_hor predictions
+                    for al, pred in enumerate(obstacle_list):
+                        x,y,rx,ry,angle,_ = pred
+                        pos = (x,y)
+                        this_ellipse = patches.Ellipse(pos, rx, ry, angle/(2*math.pi)*360, color='r', alpha=max(8-al,1)/20, label='Obstacle')
+                        path_ax.add_patch(this_ellipse)
+                        remove_later.append(this_ellipse)
+
+                plt.draw()
+                plt.pause(0.01)
+                # while not plt.waitforbuttonpress():  # XXX press a button to continue
+                #     pass
+
+                pred_line.pop(0).remove()
+                for j in range(len(remove_later)): # NOTE: dynamic obstacles (predictions)
+                    remove_later[j].remove()
+                veh.remove()
+            ### Plot in loop
+
             terminated = self.termination_condition(states, end, system_input)
             kt += self.config.num_steps_taken
 
@@ -197,4 +283,8 @@ class TrajectoryGenerator:
         uv     = system_input[0:len(system_input):2]
         uomega = system_input[1:len(system_input):2]
 
-        return xx, xy, uv, uomega
+        plt.show()
+
+        return xx, xy, uv, uomega, cost_list
+
+

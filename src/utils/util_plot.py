@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
-import matplotlib.cm as cm
 
 N_HOR = 20
 VEHICLE_WIDTH = 0.5
@@ -17,15 +16,15 @@ def plot_action(ax, action, ts): # velocity or angular velocity
     time = np.linspace(0, ts*(len(action)), len(action))
     ax.plot(time, action, '-o', markersize = 4, linewidth=2)
 
-def plot_results(graph, ts, x_coords, y_coords, vel, omega, start, end, animation=False, scanner=None, video=False):
+def plot_results(graph, ts, x_coords, y_coords, vel, omega, cost, start, end, animation=False, scanner=None, video=False):
     if animation & (scanner is not None):
-        plot_dynamic_results(graph, ts, x_coords, y_coords, vel, omega, start, end, scanner, video)
+        plot_dynamic_results(graph, ts, x_coords, y_coords, vel, omega, cost, start, end, scanner, video)
     else:
-        plot_static_results(graph, ts, x_coords, y_coords, vel, omega, start, end)
+        plot_static_results(graph, ts, x_coords, y_coords, vel, omega, cost, start, end)
 
-def plot_static_results(graph, ts, xx, xy, vel, omega, start, end):
+def plot_static_results(graph, ts, xx, xy, vel, omega, cost, start, end):
     fig = plt.figure(constrained_layout=True)
-    gs = GridSpec(2, 4, figure=fig)
+    gs = GridSpec(3, 4, figure=fig)
 
     vel_ax = fig.add_subplot(gs[0, :2])
     plot_action(vel_ax, vel, ts)
@@ -36,6 +35,11 @@ def plot_static_results(graph, ts, xx, xy, vel, omega, start, end):
     plot_action(omega_ax, omega, ts)
     omega_ax.set_xlabel('Time [s]')
     omega_ax.set_ylabel('Angular velocity [rad/s]')
+
+    cost_ax = fig.add_subplot(gs[2, :2])
+    plot_action(cost_ax, cost, ts)
+    cost_ax.set_xlabel('Time [s]')
+    cost_ax.set_ylabel('Cost')
 
     path_ax = fig.add_subplot(gs[:, 2:])
     path_ax.plot(xx, xy, c='b', label='Path', marker='o', alpha=0.5)
@@ -59,14 +63,14 @@ def plot_static_results(graph, ts, xx, xy, vel, omega, start, end):
     path_ax.axis('equal')
     plt.show()
 
-def plot_dynamic_results(graph, ts, xx, xy, vel, omega, start, end, scanner, make_video):
+def plot_dynamic_results(graph, ts, xx, xy, vel, omega, cost, start, end, scanner, make_video):
     if make_video:
         from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
         fig = plt.figure(constrained_layout=True, figsize=(16,9))
     else:
         fig = plt.figure(constrained_layout=True)
     
-    gs = GridSpec(2, 4, figure=fig)
+    gs = GridSpec(3, 4, figure=fig)
 
     vel_ax = fig.add_subplot(gs[0, :2])
     vel_line, = vel_ax.plot([1], '-o', markersize=4, linewidth=2)
@@ -83,6 +87,13 @@ def plot_dynamic_results(graph, ts, xx, xy, vel, omega, start, end, scanner, mak
     omega_ax.set_xlabel('Time [s]')
     omega_ax.set_ylabel('Angular velocity [rad/s]')
     omega_ax.grid('on')
+
+    cost_ax = fig.add_subplot(gs[2, :2])
+    cost_line, = cost_ax.plot([1], '-o', markersize=4, linewidth=2)    
+    cost_ax.set_xlim(0, ts * len(xx))
+    cost_ax.set_ylim(min(cost) - 0.1, max(cost) + 0.1)
+    cost_ax.set_xlabel('Time [s]')
+    cost_ax.set_ylabel('Cost')
 
     path_ax = fig.add_subplot(gs[:, 2:])
     path_ax.plot(start[0], start[1], marker='*', color='g', markersize=15, label='Start')
@@ -116,6 +127,10 @@ def plot_dynamic_results(graph, ts, xx, xy, vel, omega, start, end, scanner, mak
         time = np.linspace(0, ts*i, i)
         omega_line.set_data(time, omega[:i])
         vel_line.set_data(time, vel[:i])
+        try:
+            cost_line.set_data(time, cost[:i])
+        except:
+            cost_line.set_data(time, cost)
         path_line.set_data(xx[:i], xy[:i])
 
         veh = plt.Circle((xx[i], xy[i]), VEHICLE_WIDTH/2, color='b', alpha=0.7, label='Robot')
@@ -139,7 +154,7 @@ def plot_dynamic_results(graph, ts, xx, xy, vel, omega, start, end, scanner, mak
         pred = []
         for j, obstacle in enumerate(scanner.get_full_obstacle_list(i*ts, N_HOR, ts=ts)):
             for al, obsya in enumerate(obstacle):
-                x,y,rx,ry,angle = obsya
+                x,y,rx,ry,angle,_ = obsya
                 pos = (x,y)
                 this_ellipse = patches.Ellipse(pos, rx*2, ry*2, angle/(2*math.pi)*360, color='r', alpha=max(8-al,1)/20, label='Obstacle')
                 pred.append(this_ellipse)

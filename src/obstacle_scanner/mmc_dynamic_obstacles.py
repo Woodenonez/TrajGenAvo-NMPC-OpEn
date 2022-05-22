@@ -36,8 +36,7 @@ class ObstacleScanner():
     def __init__(self):
         self.num_obstacles = 1 # fixed here
         self.config = SimpleConfig() # helper
-        self.start_time = 0 * self.config.ts
-        self.start_offset = 7
+        self.start_time = -7 * self.config.ts
 
         self.create_pedestrian(index=2)
 
@@ -69,13 +68,10 @@ class ObstacleScanner():
                     obs_pred = obs_dict[list(obs_dict)[T+1]][n]
                 except:
                     obs_pred = obs_dict[list(obs_dict)[T+1]][0]
-                x  = obs_pred[1]
-                y  = obs_pred[2]
-                rx = obs_pred[3]
-                ry = obs_pred[4]
+                alpha, x, y, rx ,ry = obs_pred
                 rx += self.config.vehicle_width/2 + self.config.vehicle_margin
                 ry += self.config.vehicle_width/2 + self.config.vehicle_margin
-                obs_T = (x, y, rx, ry, 0)
+                obs_T = (x, y, rx, ry, 0, alpha) # angle=0
                 obs_list.append(obs_T)
             obstacles_list.append(obs_list)
         return obstacles_list # x, y, rx, ry, theta for t in horizon
@@ -100,8 +96,8 @@ class ObstacleScanner():
         T = 20 # prediction time offset
         sigma_x = 0.2
         sigma_y = 0.2
-        a1 = 0.2 # no crossing
-        a2 = 0.8 # do crossing
+        a1 = 0.5 # no crossing
+        a2 = 0.5 # do crossing
         self.obj_list = []
 
         x_before_crossing = np.arange(start=0, stop=10, step=speed).tolist()
@@ -119,33 +115,34 @@ class ObstacleScanner():
         else:
             x_m1 += [x_m1[-1]]*len_diff
             y_m1 += [y_m1[-1]]*len_diff
+        x_m1 += [x_m1[-1]]*100
+        y_m1 += [y_m1[-1]]*100
+        x_m2 += [x_m2[-1]]*100
+        y_m2 += [y_m2[-1]]*100
 
         this_x = [x_m1, x_m2][index-1]
         this_y = [y_m1, y_m2][index-1]
-        this_x = this_x + [this_x[-1]]*100
-        this_y = this_y + [this_y[-1]]*100
         for k in range(0, len(this_x)-1-T):
             this_dict = {'info':[k, this_x[k], this_y[k]]}
-            if k < len(x_before_crossing): # with two potential modes
+            if k < len(x_before_crossing): # with two potential modes [k < len(x_before_crossing)]
                 for i, key in enumerate([f'pred_T{x}' for x in range(1,T+1)]):
-                    this_dict[key] = [[a1, x_m1[k+i+1], y_m1[k+i+1], sigma_x*(1+a1), sigma_y*(1+a1)], 
-                                      [a2, x_m2[k+i+1], y_m2[k+i+1], sigma_x*(1+a2), sigma_y*(1+a2)]]
+                    this_dict[key] = [[a1, x_m1[k+i+1], y_m1[k+i+1], sigma_x*(2)*(i+1)/T, sigma_y*(2)*(i+1)/T], 
+                                      [a2, x_m2[k+i+1], y_m2[k+i+1], sigma_x*(2)*(i+1)/T, sigma_y*(2)*(i+1)/T]]
             else: # collapse to one mode
                 for i, key in enumerate([f'pred_T{x}' for x in range(1,T+1)]):
-                    this_dict[key] = [[1, this_x[k+i+1], this_y[k+i+1], sigma_x*2, sigma_y*2]]
+                    this_dict[key] = [[1, this_x[k+i+1], this_y[k+i+1], sigma_x*2*(i+1)/T, sigma_y*2*(i+1)/T]]
             self.obj_list.append(this_dict)
         return self.obj_list
 
     def get_obs_dict(self, current_time):
         if current_time >= self.start_time:
             time_step = int((current_time-self.start_time)/self.config.ts)
-            if (time_step+self.start_offset) <= len(list(self.obj_list))-1:
-                obs_dict = self.obj_list[time_step+self.start_offset]
+            if time_step <= len(list(self.obj_list))-1:
+                obs_dict = self.obj_list[time_step]
                 return obs_dict # pred
         return None
         
 
-    
 if __name__ == '__main__':
 
     # from pathlib import Path

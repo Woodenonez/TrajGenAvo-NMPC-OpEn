@@ -15,36 +15,39 @@ lin_acc_max: 1      # Vehicle contraint on the maximal linear acceleration
 ang_vel_max: 0.5    # Vehicle contraint on the maximal angular velocity
 ang_acc_max: 3      # Vehicle contraint on the maximal angular acceleration (considered to be symmetric)
 
-# Parameters specific to the solution algorithm
+# Velocity profile (proportional to the maximal speed)
+full_speed:   1.0
+high_speed:   0.8
+medium_speed: 0.5
+low_speed:    0.2
+
+# Parameters specific to the MPC
 ts: 0.2             # Size of the time-step (sampling time)
 N_hor: 20           # The length of the receding horizon controller
-throttle_ratio: 0.8 # What % of the maximal velocity should we try to
 num_steps_taken: 1  # How many steps should be taken from each mpc-solution. Range (1 - N_hor)
-vel_red_steps: 10   # Number of timesteps for braking when close to goal position
 
 # Weights
-lin_vel_penalty: 0      # Cost for linear velocity control action
+lin_vel_penalty: 0      # Cost for linear velocity control action (should be 0)
 lin_acc_penalty: 10.0   # Cost for linear acceleration 
 ang_vel_penalty: 0      # Cost angular velocity control action
 ang_acc_penalty: 5.0    # Cost angular acceleration
-qcte: 20               # Cost for cross-track-error from each line segment
-qp: 0.0                 # Cost for position deviation (each time step vs reference point)
-qv: 10.0                # Cost for speed deviation each time step
-qtheta: 0.0             # Cost for each heading relative to the final refernce position
+qcte: 20.0                # Cost for cross-track-error from each line segment
+qpos: 0.0                 # Cost for position deviation each time step to the reference
+qvel: 10.0                # Cost for speed    deviation each time step to the reference
+qtheta: 0.0             # Cost for heading  deviation each time step to the reference
+# Terminal weights
 qpN: 0.0                # Terminal cost; error relative to final reference position         
 qthetaN: 0.0            # Terminal cost; error relative to final reference heading 
 
 # Helper variables (Generally does not have to be changed)
 ns: 3     # Number of states for the robot (x,y,theta,e) [e is the tunnel width]
-nq: 10    # Number of optimization parameters
+nq: 10    # Number of optimization penalties
 nu: 2     # Number of control inputs
-# Nobs: 10  # Maximal number of obstacles
-# nobs: 3   # Number of variables per obstacles
 Ndynobs: 3 # Maximal number of dynamic obstacles
-ndynobs: 5 # Number of variables per dynamic obstacle
+ndynobs: 6 # Number of variables per dynamic obstacle
 
 # Building options in the optimizer
 build_type: 'release'           # Can have 'debug' or 'release'
 build_directory: 'mpc_build'  # Name of the directory where the build is created
 bad_exit_codes: ["NotConvergedIterations", "NotConvergedOutOfTime"] # Optimizer specific names
-optimizer_name: 'navigation' # optimizer type
+optimizer_name: 'navigation' # optimizer name
