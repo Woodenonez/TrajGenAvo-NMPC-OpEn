@@ -23,8 +23,9 @@ Comments:
 
 ### Customize
 config_fn = 'default.yaml'
-init_build = True
-show_animation = True
+init_build = False
+plot_in_loop = True
+show_animation = False
 save_animation = False
 plot_prediction = True
 
@@ -44,7 +45,7 @@ traj_gen = TrajectoryGenerator(config, build=init_build)
 ### Run MPC
 start = list(graph.start)
 end   = list(graph.end)
-xx,xy,uv,uomega,tot_solver_time,overhead_times = traj_gen.run(graph, start, end)
+xx,xy,uv,uomega,tot_solver_time,overhead_times = traj_gen.run(graph, start, end, plot_in_loop=plot_in_loop)
 
 ### Plot results (press any key to continue if dynamic)
 traj_gen.plot_results(xx,xy,uv,uomega, start, end, animation=show_animation, video=save_animation, plot_prediction=plot_prediction)

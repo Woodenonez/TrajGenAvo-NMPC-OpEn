@@ -236,7 +236,7 @@ class TrajectoryGenerator:
             
         plt.show()
 
-    def run(self, graph_map:object, start, end):
+    def run(self, graph_map:object, start, end, plot_in_loop):
         '''
         Description:
             Run the trajectory planner.
@@ -312,6 +312,36 @@ class TrajectoryGenerator:
         terminal = False
         establish_heading = False
         t_temp = time.time()
+
+        ### Plot in loop XXX
+        if plot_in_loop:
+            fig = plt.figure(constrained_layout=True)
+            gs = GridSpec(3, 4, figure=fig)
+
+            vel_ax = fig.add_subplot(gs[0, :2])
+            vel_ax.set_xlabel('Time [s]')
+            vel_ax.set_ylabel('Velocity [m/s]')
+            vel_ax.grid('on')
+
+            omega_ax = fig.add_subplot(gs[1, :2])
+            omega_ax.set_xlabel('Time [s]')
+            omega_ax.set_ylabel('Angular velocity [rad/s]')
+            omega_ax.grid('on')
+
+            cost_ax = fig.add_subplot(gs[2, :2])
+            cost_ax.set_xlabel('Time [s]')
+            cost_ax.set_ylabel('Cost')
+            cost_ax.grid('on')
+
+            path_ax = fig.add_subplot(gs[:, 2:])
+            path_ax.plot(start[0], start[1], marker='*', color='g', markersize=15, label='Start')
+            path_ax.plot(end[0], end[1], marker='*', color='r', markersize=15, label='End')
+            path_ax.arrow(start[0], start[1], math.cos(start[2]), math.sin(start[2]), head_width=0.05, head_length=0.1, fc='k', ec='k')
+            path_ax.set_xlabel('X [m]', fontsize=15)
+            path_ax.set_ylabel('Y [m]', fontsize=15)
+            path_ax.axis('equal')
+        ### Plot in loop
+
         try:
             while (not terminal) and t < 500.0/self.config.ts:
                 t_overhead = time.time()
@@ -394,7 +424,7 @@ class TrajectoryGenerator:
                             stc_constraints + dyn_constraints
 
                 try:
-                    exit_status, solver_time = self.mpc_generator.run(params, self.solver, self.config.num_steps_taken, system_input, states)
+                    exit_status, solver_time, cost = self.mpc_generator.run(params, self.solver, self.config.num_steps_taken, system_input, states)
                     self.solver_times.append(solver_time)
                 except RuntimeError as err:
                     print("Fatal: Cannot run.")
@@ -411,6 +441,34 @@ class TrajectoryGenerator:
 
                 t += self.config.num_steps_taken
                 loop_time = (time.time() - t_overhead)*1000.0
+
+                ### Plot in loop XXX
+                if plot_in_loop:
+                    vel_ax.plot(t*self.config.ts, system_input[-2], 'bo')
+                    omega_ax.plot(t*self.config.ts, system_input[-1], 'bo')
+                    cost_ax.plot(t*self.config.ts, cost, 'bo')
+
+                    veh = plt.Circle((states[-3], states[-2]), self.config.vehicle_width/2, color='b', alpha=0.7, label='Robot')
+                    path_ax.add_artist(veh)
+                    path_ax.plot(states[-3], states[-2], 'b.')
+                    remove_later = []
+                    for obstacle_list in full_obstacle_list: # each "obstacle_list" has N_hor predictions
+                        for al, pred in enumerate(obstacle_list):
+                            x,y,rx,ry,angle = pred
+                            pos = (x,y)
+                            this_ellipse = patches.Ellipse(pos, rx, ry, angle/(2*math.pi)*360, color='r', alpha=max(8-al,1)/20, label='Obstacle')
+                            path_ax.add_patch(this_ellipse)
+                            remove_later.append(this_ellipse)
+
+                    plt.draw()
+                    plt.pause(0.01)
+                    # while not plt.waitforbuttonpress():  # XXX press a button to continue
+                    #     pass
+
+                    for j in range(len(remove_later)): # NOTE: dynamic obstacles (predictions)
+                        remove_later[j].remove()
+                    veh.remove()
+                ### Plot in loop
 
                 self.loop_time.append(loop_time)
                 self.overhead_times.append(loop_time-solver_time)
@@ -444,6 +502,9 @@ class TrajectoryGenerator:
         xy = states[1:len(states):self.config.ns]
         uv = system_input[0:len(system_input):2]
         uomega = system_input[1:len(system_input):2]
+
+        if plot_in_loop:
+            plt.show()
 
         return xx, xy, uv, uomega, self.solver_times, self.overhead_times
 

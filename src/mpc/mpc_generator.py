@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import opengen as og
 import casadi.casadi as cs
 
+from mpc import mpc_helper as helper
+
 '''
 File info:
     Name    - [mpc_generator]
@@ -18,45 +20,6 @@ Comments:
 '''
 
 MAX_SOVLER_TIME = 500_000 # ms
-
-def dist_point_to_lineseg(point, line_segment):
-    '''
-    Arguments:
-        point        <ndarray>          - column vector
-        line_segment <list of ndarray>  - two points
-    Return:
-        distance <value>
-    Comments:
-        [Ref] https://math.stackexchange.com/questions/330269/the-distance-from-a-point-to-a-line-segment
-    '''
-    (p, s1, s2) = (point, line_segment[0], line_segment[1])
-    s2s1 = s2-s1 # line segment
-    t_hat = cs.dot(p-s1,s2s1)/(s2s1[0]**2+s2s1[1]**2+1e-16)
-    t_star = cs.fmin(cs.fmax(t_hat,0.0),1.0) # limit t
-    temp_vec = s1 + t_star*s2s1 - p # vector pointing to closest point
-    distance = np.sqrt(temp_vec[0]**2+temp_vec[1]**2)
-    return distance
-
-def cost_cte(point, line_segments:list, weight=1):
-    '''
-    Description:
-        [Cost] Cross-track-error, penalizes on the deviation from the reference path.
-    Arguments:
-        point         <ndarray>         - column vector
-        line_segments <list of ndarray> - from the the start point to the end point
-    Comments:
-        The 'line_segments' contains segments which are end-to-end.
-    '''
-    (p, p_ls) = (point, line_segments)
-    distances_sqrt = cs.SX.ones(1)
-    for i in range(len(p_ls)-1):
-        distance = dist_point_to_lineseg(p, [p_ls[i], p_ls[i+1]])
-        distances_sqrt = cs.horzcat(distances_sqrt, distance**2)
-    cost = cs.mmin(distances_sqrt[1:]) * weight
-    return cost
-
-def cost_vec_sqaure(vector, weight=1):
-    return np.sum(np.multiply(vector**2, weight))
 
 ### Main class ###
 class MpcModule:
@@ -184,11 +147,13 @@ class MpcModule:
             distance_inside_circle = r_stc**2 - (x-x_stc)**2 - (y-y_stc)**2 # positive if inside the circular obstacle
             distance_inside_ellipse = 1 - ((x-x_dyn)*cs.cos(As)+(y-y_dyn)*cs.sin(As))**2/(rx_dyn**2) - ((x-x_dyn)*cs.sin(As)-(y-y_dyn)*cs.cos(As))**2/(ry_dyn)**2
             obstacle_constraints += cs.fmax(0, cs.vertcat(distance_inside_circle, distance_inside_ellipse))
+            # obstacle_constraints += cs.fmax(0, distance_inside_circle)
+            # cost += helper.cost_inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As], narrowness=2, weight=10)
 
             # Initialize list with CTE to all line segments
             current_p = cs.vertcat(x,y)
             path_ref = [cs.vertcat(r[i*self.config.ns], r[i*self.config.ns+1]) for i in range(1, self.config.N_hor)]
-            cost += cost_cte(current_p, path_ref, weight=qCTE) # [cost] cross track error
+            cost += helper.cost_cte(current_p, path_ref, weight=qCTE) # [cost] cross track error
             cost += rv*u_t[0]**2 + rw*u_t[1]**2 # [cost] penalize control actions
             cost += qv*(u_t[0]-r[self.config.ns*self.config.N_hor+t])**2 # [cost] deviation from refenrence velocity
             
@@ -259,6 +224,7 @@ class MpcModule:
         u = solution.solution
         exit_status = solution.exit_status
         solver_time = solution.solve_time_ms
+        cost = solution.cost
         
         system_input += u[:self.config.nu*take_steps]
 
@@ -274,7 +240,7 @@ class MpcModule:
                        y + self.config.ts * (u_v * math.sin(theta)), 
                        theta + self.config.ts*u_omega]
         
-        return exit_status, solver_time
+        return exit_status, solver_time, cost
 
     def plot_action(self, ax, action): # velocity or angular velocity
         time = np.linspace(0, self.config.ts*(len(action)), len(action))
