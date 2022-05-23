@@ -62,7 +62,7 @@ end   = gpp.final_goal # special case
 ### Local path
 lpp = LocalPathPlanner(graph)
 path_node = lpp.get_ref_path_node(start, end)
-ref_path  = lpp.get_detailed_path(config.ts, config.high_speed * config.lin_vel_max, start[:2], path_node)
+ref_path  = lpp.get_detailed_path(config.ts, config.high_speed * config.lin_vel_max, start, path_node)
 
 ### Start & run MPC
 traj_gen = TrajectoryGenerator(config, build=init_build, verbose=True)

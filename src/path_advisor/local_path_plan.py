@@ -43,7 +43,7 @@ class LocalPathPlanner:
         Return:
             ref_path <list> - List of x, y coordinates and the heading angles of the detailed reference path.
         '''
-        x, y = current_position
+        x, y = current_position[0], current_position[1]
         x_next, y_next = node_list[0]
         v_ref = reference_speed
         ts = time_step

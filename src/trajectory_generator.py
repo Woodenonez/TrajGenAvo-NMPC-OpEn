@@ -162,28 +162,28 @@ class TrajectoryGenerator:
             x_cur = states[-self.config.ns:] # set current state as initial state for solver
 
             ### full_obstacle_list = [[(x, y, rx ,ry, angle, alpha),(),...],[(),(),...]] each sub-list is a mode/obstacle
-            # full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
-            # for i, dyn_obstacle in enumerate(full_obstacle_list):
-            #     dyn_constraints[i*params_per_dyn_obs:(i+1)*params_per_dyn_obs] = list(itertools.chain(*dyn_obstacle))
+            full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
+            for i, dyn_obstacle in enumerate(full_obstacle_list):
+                dyn_constraints[i*params_per_dyn_obs:(i+1)*params_per_dyn_obs] = list(itertools.chain(*dyn_obstacle))
 
             ### XXX
-            if kt == 0: # NOTE May vary for different types of obstacles
-                full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
-                for i, dyn_obstacle in enumerate(full_obstacle_list):
-                    dyn_constraints[i*params_per_dyn_obs:(i+1)*params_per_dyn_obs] = list(itertools.chain(*dyn_obstacle))
-            else: # Rotate list to the left
-                dyn_constraints = dyn_constraints[self.config.ndynobs*self.config.num_steps_taken:] + \
-                                    dyn_constraints[:self.config.ndynobs*self.config.num_steps_taken]
-                current_time = (kt+N_hor-self.config.num_steps_taken)*self.config.ts
-                full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=current_time, horizon=self.config.num_steps_taken, ts=ts)
-                for i, dyn_obstacle in enumerate(full_obstacle_list):
-                    # Update last num_steps taken dynobs positions
-                    dyn_constraints[(i+1)*params_per_dyn_obs-self.config.ndynobs*self.config.num_steps_taken:(i+1)*params_per_dyn_obs] = list(
-                        itertools.chain(*dyn_obstacle))
+            # if kt == 0: # NOTE May vary for different types of obstacles
+            #     full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=(kt*ts), horizon=N_hor, ts=ts)
+            #     for i, dyn_obstacle in enumerate(full_obstacle_list):
+            #         dyn_constraints[i*params_per_dyn_obs:(i+1)*params_per_dyn_obs] = list(itertools.chain(*dyn_obstacle))
+            # else: # Rotate list to the left
+            #     dyn_constraints = dyn_constraints[self.config.ndynobs*self.config.num_steps_taken:] + \
+            #                         dyn_constraints[:self.config.ndynobs*self.config.num_steps_taken]
+            #     current_time = (kt+N_hor-self.config.num_steps_taken)*self.config.ts
+            #     full_obstacle_list = self.scanner.get_full_obstacle_list(current_time=current_time, horizon=self.config.num_steps_taken, ts=ts)
+            #     for i, dyn_obstacle in enumerate(full_obstacle_list):
+            #         # Update last num_steps taken dynobs positions
+            #         dyn_constraints[(i+1)*params_per_dyn_obs-self.config.ndynobs*self.config.num_steps_taken:(i+1)*params_per_dyn_obs] = list(
+            #             itertools.chain(*dyn_obstacle))
             ### XXX
 
-            print(len(full_obstacle_list), len(full_obstacle_list[0]), len(full_obstacle_list[1]))
-            print(dyn_obstacle)
+            # print(len(full_obstacle_list), len(full_obstacle_list[0]), len(full_obstacle_list[1]))
+            # print(dyn_constraints)
 
 
             ### Get reference states ###
