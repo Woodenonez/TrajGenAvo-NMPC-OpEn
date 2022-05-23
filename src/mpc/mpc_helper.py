@@ -66,13 +66,18 @@ def cost_cte(point:Union[cs.SX, cs.DM], line_segments:List[Union[cs.SX, cs.DM]],
     cost = cs.mmin(distances_sqrt[1:]) * weight
     return cost
 
-def cost_inside_ellipse(point:Union[List, cs.SX, cs.DM], ellipse_param:List[Union[cs.SX, cs.DM]], narrowness=5, weight:float=1):
+def cost_inside_ellipse(point:Union[List, cs.SX, cs.DM], ellipse_param:List[Union[cs.SX, cs.DM]], weight:float=1):
     if len(ellipse_param) > 5:
         alpha = ellipse_param[5]
     else:
         alpha = 1
     indicator = inside_ellipse(point, ellipse_param) # indicator<0, if outside ellipse
-    cost = cs.sum1( weight / (1+cs.exp(-narrowness*indicator-4)) * alpha )
+
+    indicator = cs.sum1(cs.fmax(0.0, indicator)**2 * alpha)
+    cost = indicator * weight
+
+    # narrowness = 5
+    # cost = cs.sum1( weight / (1+cs.exp(-narrowness*indicator-4)) * alpha )
     return cost
 
 if __name__ == '__main__':

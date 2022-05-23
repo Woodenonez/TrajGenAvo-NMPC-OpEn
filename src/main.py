@@ -38,7 +38,7 @@ Branches:
 ### Customize
 config_fn = 'default.yaml'
 init_build = False
-plot_in_loop = True
+plot_in_loop = False
 show_animation = False
 save_animation = False
 

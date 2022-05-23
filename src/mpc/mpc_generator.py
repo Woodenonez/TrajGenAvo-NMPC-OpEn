@@ -93,7 +93,7 @@ class MpcModule:
 
             # ellipse center - x_dyn, y_dyn;  radii - rx_dyn, ry_dyn;  angles of ellipses (positive from x axis) - As
             # penalty_constraints += cs.fmax(0, helper.inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As]))
-            cost += helper.cost_inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As, alpha_dyn], narrowness=5, weight=10)
+            cost += helper.cost_inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As, alpha_dyn], weight=10)
 
             # Initialize list with CTE to all line segments
             path_ref = [cs.vertcat(r[i*self.config.ns], r[i*self.config.ns+1]) for i in range(1, self.config.N_hor)]
