@@ -4,6 +4,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches
+from matplotlib.collections import PatchCollection
 
 import pyclipper
 
@@ -41,31 +42,52 @@ class Graph:
     Functions
         plot_map <vis> - Visualization of the map. Plot directly.
     '''
-    def __init__(self, inflate_margin):
-        self.boundary_coords = [(0, 0), (16, 0), (16, 10), (0, 10)]  # in counter-clockwise ordering
-        self.obstacle_list = [[(0, 1.5), (0, 1.6), (9, 1.6), (9, 1.5)],
-                              [(0, 8.4), (0, 8.5), (9, 8.5), (9, 8.4)],
-                              [(11, 1.5), (11, 1.6), (16, 1.6), (16, 1.5)],
-                              [(11, 8.4), (11, 8.5), (16, 8.5), (16, 8.4)]] # in clock-wise ordering
-        self.crossing_area = [(9, 1.5), (11, 1.5), (11, 8.5), (9, 8.5)]
+    def __init__(self, inflate_margin=0):
+        self.boundary_coords = [(0, 0), (12, 0), (12, 16), (0, 16)]  # in counter-clockwise ordering
+        self.obstacle_list = [[(0, 0), (0, 3), (3, 3), (3, 0)],
+                              [(0, 9), (0, 12), (3, 12), (3, 9)],
+                              [(9, 9), (9, 12), (12, 12), (12, 9)],
+                              [(9, 0), (9, 3), (12, 3), (12, 0)]] # in clock-wise ordering
+        self.sidewalk_list = [[(0, 3), (0, 4), (4, 4), (4, 0), (3, 0), (3, 3)],
+                              [(0, 8), (0, 9), (3, 9), (3, 12), (4, 12), (4, 8)],
+                              [(8, 8), (8, 12), (9, 12), (9, 9), (12, 9), (12, 8)],
+                              [(8, 0), (8, 4), (12, 4), (12, 3), (9, 3), (9, 0)]]
+        self.crossing_area = [[(4, 3), (4, 4), (8, 4), (8, 3)],
+                              [(3, 4), (3, 8), (4, 8), (4, 4)],
+                              [(4, 8), (4, 9), (8, 9), (8, 8)],
+                              [(8, 4), (8, 8), (9, 8), (9, 4)]]
 
         self.inflation(inflate_margin=inflate_margin)
 
     def plot_map(self, ax, start=None, end=None):
         boundary = np.array(self.boundary_coords + [self.boundary_coords[0]])
+        # Boundary
         ax.plot(boundary[:,0], boundary[:,1], 'k')
-        ax.plot([0, 16], [5, 5], c='orange', linestyle='--')
-        ax.fill_between([0, 16], [1.6, 1.6], [8.4, 8.4], color='lightgray')
-        crossing = patches.Polygon(self.crossing_area, hatch='-', fc='white', ec='gray')
-        ax.add_patch(crossing)
+        # Lane
+        ax.plot([0, 12], [6, 6], c='orange', linestyle='--')
+        ax.plot([6, 6], [0, 12], c='orange', linestyle='--')
+        ax.fill_between([0, 12], [4, 4], [8, 8], color='lightgray')
+        ax.fill_between([4, 8], [0, 0], [12, 12], color='lightgray')
+        # Area
+        for cs in self.crossing_area:
+            cs_edge = cs + [cs[0]]
+            xs, ys = zip(*cs_edge)
+            plt.plot(xs,ys,'gray')
+            poly = patches.Polygon(np.array(cs), hatch='-', color='white')
+            ax.add_patch(poly)
+        for sw in self.sidewalk_list:
+            # sw_edge = sw + [sw[0]]
+            # xs, ys = zip(*sw_edge)
+            # plt.plot(xs,ys,'k')
+            poly = patches.Polygon(np.array(sw), color='gray')
+            ax.add_patch(poly)
         for obs in self.obstacle_list:
             obs_edge = obs + [obs[0]]
             xs, ys = zip(*obs_edge)
-            ax.plot(xs,ys,'k')
-
-            obs = np.array(obs)
-            poly = patches.Polygon(obs, color='k')
+            plt.plot(xs,ys,'k')
+            poly = patches.Polygon(np.array(obs), color='k')
             ax.add_patch(poly)
+        # Start and end
         if start is not None:
             ax.plot(self.start[0], self.start[1], 'b*')
         if end is not None:

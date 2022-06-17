@@ -65,8 +65,9 @@ class MpcModule:
         q = cs.SX.sym('q', self.config.nq)                      # 1. Penalty parameters
         r = cs.SX.sym('r', self.config.ns*self.config.N_hor     # 2. Reference path
                          + self.config.N_hor)                   # 3. Speed reference in each step
-        o = cs.SX.sym('o', self.config.Ndynobs*self.config.ndynobs*self.config.N_hor) # 4. Dynamic obstacles
-        z = cs.vertcat(s,q,r,o)
+        o_s = cs.SX.sym('os', self.config.Nstcobs*self.config.nstcobs)                   # 4. Static obstacles
+        o_d = cs.SX.sym('od', self.config.Ndynobs*self.config.ndynobs*self.config.N_hor) # 5. Dynamic obstacles
+        z = cs.vertcat(s, q, r, o_s, o_d)
         
         (x, y, theta, v_init, w_init, x_goal, y_goal, theta_goal) = (s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
         (qpos, qvel, qtheta, rv, rw, qN, qthetaN, qCTE, acc_penalty, w_acc_penalty) = (q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9])
@@ -82,18 +83,29 @@ class MpcModule:
             state_next = helper.dynamics_rk4(self.config.ts, cs.vcat([x,y,theta]), u_t)
             x, y, theta = state_next[0], state_next[1], state_next[2]
 
+            # Static obstacles
+            x_stc = o_s[0:self.config.Nstcobs*self.config.nstcobs:self.config.nstcobs]
+            y_stc = o_s[1:self.config.Nstcobs*self.config.nstcobs:self.config.nstcobs]
+            r_stc = o_s[2:self.config.Nstcobs*self.config.nstcobs:self.config.nstcobs]
+
             # Dynamic obstacles
             # (alpha, x, y, rx, ry, tilted_angle) for obstacle 0 for N_hor steps, then (x, y, rx, ry, tilted_angle) for obstalce 1 for N_hor steps...
-            x_dyn     = o[kt*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
-            y_dyn     = o[kt*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
-            rx_dyn    = o[kt*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
-            ry_dyn    = o[kt*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
-            As        = o[kt*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
-            alpha_dyn = o[kt*self.config.ndynobs+5::self.config.ndynobs*self.config.N_hor]
+            x_dyn     = o_d[kt*self.config.ndynobs  ::self.config.ndynobs*self.config.N_hor]
+            y_dyn     = o_d[kt*self.config.ndynobs+1::self.config.ndynobs*self.config.N_hor]
+            rx_dyn    = o_d[kt*self.config.ndynobs+2::self.config.ndynobs*self.config.N_hor]
+            ry_dyn    = o_d[kt*self.config.ndynobs+3::self.config.ndynobs*self.config.N_hor]
+            As        = o_d[kt*self.config.ndynobs+4::self.config.ndynobs*self.config.N_hor]
+            alpha_dyn = o_d[kt*self.config.ndynobs+5::self.config.ndynobs*self.config.N_hor]
+
+            # Static obstacles
+            distance_inside_circle = r_stc**2 - (x-x_stc)**2 - (y-y_stc)**2 # positive if inside the circular obstacle
+            penalty_constraints += cs.fmax(0, cs.vertcat(distance_inside_circle))
 
             # ellipse center - x_dyn, y_dyn;  radii - rx_dyn, ry_dyn;  angles of ellipses (positive from x axis) - As
             # penalty_constraints += cs.fmax(0, helper.inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As]))
-            cost += helper.cost_inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As, alpha_dyn], weight=10)
+            horizon_weight = [200, 100, 50, 20, 10, 8, 5, 4, 3, 2] + [1]*10
+            # horizon_weight = [100]*20
+            cost += helper.cost_inside_ellipse([x, y], [x_dyn, y_dyn, rx_dyn, ry_dyn, As, alpha_dyn], weight=10*horizon_weight[kt])
 
             # Initialize list with CTE to all line segments
             path_ref = [cs.vertcat(r[i*self.config.ns], r[i*self.config.ns+1]) for i in range(1, self.config.N_hor)]

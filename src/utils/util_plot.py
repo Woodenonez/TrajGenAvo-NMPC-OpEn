@@ -173,8 +173,8 @@ def plot_dynamic_results(graph, ts, xx, xy, vel, omega, cost, start, end, scanne
             plt.draw()
             plt.pause(ts / 10)
 
-            while not plt.waitforbuttonpress():  # XXX press a button to continue
-                pass
+            # while not plt.waitforbuttonpress():  # XXX press a button to continue
+            #     pass
         
         veh.remove()
         for j in range(scanner.num_obstacles): # NOTE: dynamic obstacles

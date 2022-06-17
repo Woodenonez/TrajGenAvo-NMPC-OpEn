@@ -3,7 +3,8 @@ import sys, math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches
-from matplotlib.collections import PatchCollection
+
+import pyclipper
 
 '''
 File info:
@@ -38,31 +39,54 @@ class Graph:
     Functions
         plot_map <vis> - Visualization of the map. Plot directly.
     '''
-    def __init__(self, start=(0,0), end=(0,0), index=11):
+    def __init__(self, inflate_margin, index=11):
         g = TestGraphs()
         g_dict = g.get_graph(index)
-        self.boundary_coordinates   = g_dict['boundary_coordinates']    # in counter-clockwise ordering
-        self.obstacle_list          = g_dict['obstacle_list']           # in clock-wise ordering
-        self.start                  = g_dict['start']           # XXX Just for testing
-        self.end                    = g_dict['end']             # XXX Just for testing
-        self.dyn_obs_list           = g_dict['dyn_obs_list']    # XXX Just for testing
+        self.boundary_coords   = g_dict['boundary_coordinates']    # in counter-clockwise ordering
+        self.obstacle_list     = g_dict['obstacle_list']           # in clock-wise ordering
+        self.start             = g_dict['start']           # XXX Just for testing
+        self.end               = g_dict['end']             # XXX Just for testing
+        self.dyn_obs_list      = g_dict['dyn_obs_list']    # XXX Just for testing
 
-    def plot_map(self):
-        boundary = self.boundary_coordinates + [self.boundary_coordinates[0]]
+        self.inflation(inflate_margin=inflate_margin)
+
+    def plot_map(self, ax):
+        boundary = self.boundary_coords + [self.boundary_coords[0]]
         boundary = np.array(boundary)
-        fig, ax = plt.subplots()
-        plt.plot(boundary[:,0], boundary[:,1], 'k')
+        ax.plot(boundary[:,0], boundary[:,1], 'k')
         for obs in self.obstacle_list:
             obs_edge = obs + [obs[0]]
             xs, ys = zip(*obs_edge)
-            plt.plot(xs,ys,'b')
+            ax.plot(xs,ys,'b')
 
             obs = np.array(obs)
             poly = patches.Polygon(obs, color='skyblue')
             ax.add_patch(poly)
-        plt.plot(self.start[0], self.start[1], 'b*')
-        plt.plot(self.end[0], self.end[1], 'r*')
-        plt.show()
+        ax.plot(self.start[0], self.start[1], 'b*')
+        ax.plot(self.end[0], self.end[1], 'r*')
+        ax.axis('equal')
+
+    def inflation(self, inflate_margin):
+        self.inflator = pyclipper.PyclipperOffset()
+        self.processed_obstacle_list   = self.__preprocess_obstacles(self.obstacle_list, 
+                                                                     pyclipper.scale_to_clipper(inflate_margin))
+        self.processed_boundary_coords = self.__preprocess_obstacle( pyclipper.scale_to_clipper(self.boundary_coords), 
+                                                                     pyclipper.scale_to_clipper(-inflate_margin))
+
+    def __preprocess_obstacle(self, obstacle, inflation):
+        self.inflator.Clear()
+        self.inflator.AddPath(obstacle, pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
+        inflated_obstacle = pyclipper.scale_from_clipper(self.inflator.Execute(inflation))[0]
+        return inflated_obstacle    
+    
+    def __preprocess_obstacles(self, obstacle_list, inflation):
+        inflated_obstacles = []
+        for obs in obstacle_list:
+            obstacle = pyclipper.scale_to_clipper(obs)
+            inflated_obstacle = self.__preprocess_obstacle(obstacle, inflation)
+            inflated_obstacle.reverse() # obstacles are ordered clockwise
+            inflated_obstacles.append(inflated_obstacle)
+        return inflated_obstacles
 
 class TestGraphs:
     '''
@@ -147,38 +171,38 @@ class TestGraphs:
         ############### 6th Graph ############################# 
         boundary_coordinates = [(0.37, 0.32), (5.79, 0.31), (5.79, 5.18), (0.14, 5.26)]
         obstacle_list = [[(2.04, 0.28), (2.0, 3.8), (2.8, 3.81), (2.78, 0.29)]]
-        start_pos = (1.01, 0.98, math.radians(90))
-        end_pos = (3.82, 1.05, math.radians(270))
+        start = (1.01, 0.98, math.radians(90))
+        end = (3.82, 1.05, math.radians(270))
         self.graphs.append({'boundary_coordinates':boundary_coordinates, 'obstacle_list':obstacle_list, 'start':start, 'end':end, 'dyn_obs_list':[]})
 
         ############### 7th Graph ############################# 
         # NOTE: Not always working.
         boundary_coordinates = [(1.55, 1.15), (29.0, 1.1), (29.0, 28.75), (0.85, 28.9), (0.85, 1.15)]
         obstacle_list = [[(5.6, 3.3), (5.75, 20.15), (18.35, 20.05), (18.35, 19.7), (7.25, 19.7), (7.05, 3.2)], [(13.85, 23.4), (21.25, 23.35), (21.1, 16.4), (6.9, 16.35), (6.7, 12.9), (23.45, 13.25), (23.4, 25.05), (13.0, 25.35)]]
-        start_pos = (2.95, 13.5, math.radians(90))
-        end_pos = (9.6, 18.1, math.radians(180))
+        start = (2.95, 13.5, math.radians(90))
+        end = (9.6, 18.1, math.radians(180))
         self.graphs.append({'boundary_coordinates':boundary_coordinates, 'obstacle_list':obstacle_list, 'start':start, 'end':end, 'dyn_obs_list':[]})
 
         ############### 8th Graph #############################
         boundary_coordinates = [(2.0, 1.08), (22.8, 1.12), (22.84, 19.16), (1.8, 19.24)]
         obstacle_list = [[(9.64, 5.28), (9.56, 10.72), (8.68, 11.88), (9.48, 12.2), (10.52, 10.96), (11.6, 12.12), (12.6, 11.36), (11.28, 10.4), (11.6, 0.56), (9.68, 0.68)]]
-        start_pos = (7.16, 8.16, math.radians(90))
-        end_pos = (12.72, 9.32, math.radians(265))
+        start = (7.16, 8.16, math.radians(90))
+        end = (12.72, 9.32, math.radians(265))
         self.graphs.append({'boundary_coordinates':boundary_coordinates, 'obstacle_list':obstacle_list, 'start':start, 'end':end, 'dyn_obs_list':[]})
 
         ############### 9th Graph #############################
         #NOTE: Not always working.
         boundary_coordinates = [(0.96, 1.88), (22.88, 1.72), (22.92, 20.8), (0.64, 20.92)]
         obstacle_list = [[(9.12, 1.48), (8.8, 9.56), (9.76, 12.72), (10.8, 9.56), (11.08, 1.48)]]
-        start_pos = (7.44, 6.16, math.radians(90))
-        end_pos = (12.44, 6.4, math.radians(265))
+        start = (7.44, 6.16, math.radians(90))
+        end = (12.44, 6.4, math.radians(265))
         self.graphs.append({'boundary_coordinates':boundary_coordinates, 'obstacle_list':obstacle_list, 'start':start, 'end':end, 'dyn_obs_list':[]})
 
         ############### 10th Graph ############################# 
         boundary_coordinates = [(2.36, 1.6), (22.6, 1.84), (22.16, 21.04), (1.52, 20.88)]
         obstacle_list = [[(9.92, 1.24), (9.64, 8.52), (12.6, 10.44), (15.6, 8.76), (15.76, 1.08)]]
-        start_pos = (7.08, 5.88, math.radians(90))
-        end_pos = (17.8, 6.56, math.radians(265))
+        start = (7.08, 5.88, math.radians(90))
+        end = (17.8, 6.56, math.radians(265))
         self.graphs.append({'boundary_coordinates':boundary_coordinates, 'obstacle_list':obstacle_list, 'start':start, 'end':end, 'dyn_obs_list':[]})
 
         ############### 11th Graph #############################
@@ -188,8 +212,8 @@ class TestGraphs:
             [(65.0, 6.0), (28.1, 6.0), (28.1, 33.0), (65.0, 33.0)], 
             [(4.4, 34.1), (44.0, 34.1), (44.0, 39.3), (55.3, 39.6), (55.3, 42.8), (44.0, 42.3), (44.1, 49.1), (54.9, 49.2), (54.9, 53.0), (4.7, 53.0)], 
             [(47.7, 36.2), (47.7, 34.6), (57.8, 34.5), (57.8, 36.3)]]
-        start_pos = (27.8, 2.7, math.radians(90))
-        end_pos = (50.3, 45.9, math.radians(0))
+        start = (27.8, 2.7, math.radians(90))
+        end = (50.3, 45.9, math.radians(0))
         self.graphs.append({'boundary_coordinates':boundary_coordinates, 'obstacle_list':obstacle_list, 'start':start, 'end':end, 'dyn_obs_list':[]})
 
         ############### 12th Graph #############################

@@ -38,7 +38,7 @@ class ObstacleScanner():
         self.config = SimpleConfig() # helper
         self.start_time = -7 * self.config.ts
 
-        self.create_pedestrian(index=1)
+        self.create_pedestrian(index=2)
 
     def get_obstacle_info(self, idx, current_time, key): # the start time of the first prediction
         obs_dict = self.get_obs_dict(current_time)
@@ -96,8 +96,8 @@ class ObstacleScanner():
         T = 20 # prediction time offset
         sigma_x = 0.2
         sigma_y = 0.2
-        a1 = 0.8 # no crossing
-        a2 = 0.2 # do crossing
+        a1 = 0.5 # no crossing
+        a2 = 0.5 # do crossing
         self.obj_list = []
 
         x_before_crossing = np.arange(start=0, stop=10, step=speed).tolist()

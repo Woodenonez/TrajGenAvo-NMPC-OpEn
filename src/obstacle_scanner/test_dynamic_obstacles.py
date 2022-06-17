@@ -1,4 +1,4 @@
-import sys, math
+import os, sys
 import numpy as np
 
 try:
@@ -29,9 +29,7 @@ class ObstacleScanner():
     Comments:
         Other attributes and functions are just for testing and specific in thie file.
     '''
-    def __init__(self):
-        
-        graph = Graph(index=11) # with dynamic obstacle
+    def __init__(self, graph:Graph):
         self.__dyn_obs_list = graph.dyn_obs_list # x, y, freq, rx, ry, theta
         self.num_obstacles = len(self.__dyn_obs_list)
 
@@ -42,28 +40,24 @@ class ObstacleScanner():
         obs_dict = {'position':tuple(pos), 'pos':tuple(pos), 'radius':(rx,ry), 'axis':(rx,ry), 'heading':angle, 'angle':angle}
         return obs_dict[key]
 
-    def get_full_obstacle_list(self, current_time, horizon, ts):
+    def get_full_obstacle_list(self, current_time, horizon, ts=0.2):
         obstacle_list = self.get_dyn_obstacle(current_time, horizon, ts)
         return obstacle_list # x, y, rx, ry, theta for t in horizon
 
     # Below just for testing
     def gen_obstacle_point(self, p1, p2, freq, time):
-        p1 = np.array(p1)
-        p2 = np.array(p2)
         time = np.array(time)
         t = abs(np.sin(freq * time))
         if type(t) == np.ndarray:
             t = np.expand_dims(t,1)
-        p3 = t*p1 + (1-t)*p2
+        p3 = t*np.array(p1) + (1-t)*np.array(p2)
         return p3
 
-    def get_dyn_obstacle(self, t, horizon=20, ts=0.2):
+    def get_dyn_obstacle(self, t, horizon, ts):
         vehicle_width = 0.5
         vehicle_margin = 0.25
-
         if len(self.__dyn_obs_list) == 0:
             return []
-
         time = np.linspace(t, t+horizon*ts, horizon)
         obs_list = []
         for obs in self.__dyn_obs_list:
@@ -71,6 +65,6 @@ class ObstacleScanner():
             x_radius = x_radius+vehicle_width/2+vehicle_margin
             y_radius = y_radius+vehicle_width/2+vehicle_margin
 
-            q = [(*self.gen_obstacle_point(p1, p2, freq, t), x_radius, y_radius, angle) for t in time]
+            q = [(*self.gen_obstacle_point(p1, p2, freq, t), x_radius, y_radius, angle, 1) for t in time] # alpha=1
             obs_list.append(q)
         return obs_list # x, y, rx, ry, theta

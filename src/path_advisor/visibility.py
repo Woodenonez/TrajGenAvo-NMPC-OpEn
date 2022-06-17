@@ -94,7 +94,7 @@ class VisibilityPathFinder:
         if not (len(path) > 2):
            print(f'{self.print_name} Path is only one line. No vertices to find.') 
            return vertices
-        all_vert = self.obstacle_list + [self.boundary_coordinates]
+        all_vert = self.graph.obstacle_list + [self.graph.boundary_coords]
         all_vert = [item for sublist in all_vert for item in sublist]
         for vert in path[1:-1]: # dont use start and final positions as contstraints
             closest_vert, _ = self.get_closest_vert(vert, all_vert)
@@ -102,8 +102,8 @@ class VisibilityPathFinder:
         return vertices
     
     def plot_map(self, ax, vert_radius=1):
-        plot_boundaries(self.graph.boundary_coordinates,           ax=ax, color='k', label='Original Boundary')
-        plot_boundaries(self.graph.processed_boundary_coordinates, ax=ax, color='g', label='Padded Boundary')
+        plot_boundaries(self.graph.boundary_coords,           ax=ax, color='k', label='Original Boundary')
+        plot_boundaries(self.graph.processed_boundary_coords, ax=ax, color='g', label='Padded Boundary')
         plot_obstacles( self.graph.obstacle_list,                  ax=ax, color='r', label='Original Obstacles')
         plot_obstacles( self.graph.processed_obstacle_list,        ax=ax, color='y', label='Padded Obstacles')
         

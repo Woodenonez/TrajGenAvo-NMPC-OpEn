@@ -4,11 +4,11 @@ from pathlib import Path
 
 from utils.config import Configurator
 
-from map_generator.mmc_graph import Graph # choose the correct file
 from path_advisor.global_path_plan import GloablPathPlanner
 from path_advisor.local_path_plan import LocalPathPlanner
 from trajectory_generator import TrajectoryGenerator
-from obstacle_scanner.mmc_dynamic_obstacles import ObstacleScanner
+
+from scenario_simulator import Simulator
 
 from utils import util_plot
 
@@ -38,36 +38,34 @@ Branches:
 ### Customize
 config_fn = 'default.yaml'
 init_build = False
-plot_in_loop = False
+plot_in_loop = True
 show_animation = False
 save_animation = False
-
-start = (0.6, 3.3, math.radians(0)) # this should be detected/calculated in real scenes
+case_index = 2
 
 ### Load configuration
 yaml_fp = os.path.join(Path(__file__).resolve().parents[1], 'configs', config_fn)
 configurator = Configurator(yaml_fp)
 config = configurator.configurate()
 
-### Load map
-graph = Graph(inflate_margin=config.vehicle_width)
+### Load simulator
+sim = Simulator(index=case_index, inflate_margin=config.vehicle_width)
 
 ### Global path
-gpp = GloablPathPlanner(external_path=[(15.4, 3.3, math.radians(0))])
-gpp.set_start_point(start) # must set the start point
+gpp = GloablPathPlanner(external_path=sim.waypoints)
+gpp.set_start_point(sim.start) # must set the start point
 
 start = gpp.start
-end   = gpp.final_goal # special case
+end   = gpp.final_goal # special case, otherwise iterate waypoints
 
 ### Local path
-lpp = LocalPathPlanner(graph)
+lpp = LocalPathPlanner(sim.graph)
 path_node = lpp.get_ref_path_node(start, end)
 ref_path  = lpp.get_detailed_path(config.ts, config.high_speed * config.lin_vel_max, start, path_node)
 
 ### Start & run MPC
-traj_gen = TrajectoryGenerator(config, build=init_build, verbose=True)
+traj_gen = TrajectoryGenerator(config, obstacle_info=sim.scanner, graph_map=sim.graph, build=init_build, verbose=True)
 xx, xy, uv, uomega, cost_list = traj_gen.run(ref_path, list(start), list(end), plot_in_loop=plot_in_loop)
 
 ### Plot results (press any key to continue in dynamic mode if stuck)
-scanner = ObstacleScanner()
-util_plot.plot_results(graph, config.ts, xx, xy, uv, uomega, cost_list, start, end, animation=show_animation, scanner=scanner, video=save_animation)
+util_plot.plot_results(sim.graph, config.ts, xx, xy, uv, uomega, cost_list, start, end, animation=show_animation, scanner=sim.scanner, video=save_animation)
