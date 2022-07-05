@@ -120,4 +120,8 @@ if __name__ == '__main__':
     graph = Graph(0)
     _, ax = plt.subplots()
     graph.plot_map(ax)
+    ax.text(6,-0.5,'S')
+    ax.text(6,12.5,'N')
+    ax.text(-0.5,6,'W')
+    ax.text(12.5,6,'E')
     plt.show()
