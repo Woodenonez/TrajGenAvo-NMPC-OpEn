@@ -1,4 +1,5 @@
 import os, math, time
+from typing import List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -285,7 +286,19 @@ class MpcModule:
                        y + self.config.ts * (u_v * math.sin(theta)), 
                        theta + self.config.ts*u_omega]
         
-        return exit_status, solver_time
+        x = states[-3]
+        y = states[-2]
+        theta = states[-1]
+        pred_states:List[np.ndarray] = [np.array(states[-3:])]
+        for i in range(len(u)//self.config.nu):
+            u_v, u_omega = u[i*self.config.nu], u[1+i*self.config.nu]
+            pred_state_next = [pred_states[-1][0] + self.config.ts * (u_v * math.cos(pred_states[-1][2])), # XXX
+                               pred_states[-1][1] + self.config.ts * (u_v * math.sin(pred_states[-1][2])), 
+                               pred_states[-1][2] + self.config.ts * u_omega]
+            pred_states.append(pred_state_next)
+        pred_states = pred_states[1:]
+        
+        return exit_status, solver_time, pred_states
 
     def plot_action(self, ax, action): # velocity or angular velocity
         time = np.linspace(0, self.config.ts*(len(action)), len(action))

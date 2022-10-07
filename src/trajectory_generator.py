@@ -74,9 +74,9 @@ class TrajectoryGenerator:
         if build:
             self.mpc_generator.build()
 
-    def plot_results(self, x_coords, y_coords, vel, omega, start, end, animation=False, video=False, plot_prediction=False):
+    def plot_results(self, x_coords, y_coords, vel, omega, pred_states_list, start, end, animation=False, video=False, plot_prediction=False):
         if animation:
-            self.plot_dynamic_results(x_coords, y_coords, vel, omega, start, end, video, plot_prediction)
+            self.plot_dynamic_results(x_coords, y_coords, vel, omega, pred_states_list, start, end, video, plot_prediction)
         else:
             self.plot_static_results(x_coords, y_coords, vel, omega, start, end)
 
@@ -115,7 +115,7 @@ class TrajectoryGenerator:
         path_ax.axis('equal')
         plt.show()
 
-    def plot_dynamic_results(self, xx, xy, vel, omega, start, end, make_video, plot_prediction):
+    def plot_dynamic_results(self, xx, xy, vel, omega, pred_states_list, start, end, make_video, plot_prediction):
         if make_video:
             from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
             fig = plt.figure(constrained_layout=True, figsize=(16,9))
@@ -147,6 +147,7 @@ class TrajectoryGenerator:
 
         self.ppp.plot_map(path_ax, vert_radius=self.config.vehicle_width)
         path_line, = path_ax.plot([1], '-ob', alpha=0.7, markersize=5)
+        pred_line, = path_ax.plot([1], '-om', alpha=0.6, markersize=2)
         path_ax.set_xlabel('X [m]', fontsize=15)
         path_ax.set_ylabel('Y [m]', fontsize=15)
         path_ax.axis('equal')
@@ -172,6 +173,7 @@ class TrajectoryGenerator:
             omega_line.set_data(time, omega[:i])
             vel_line.set_data(time, vel[:i])
             path_line.set_data(xx[:i], xy[:i])
+            pred_line.set_data(np.array(pred_states_list[i])[:,0], np.array(pred_states_list[i])[:,1])
 
             veh = plt.Circle((xx[i], xy[i]), self.config.vehicle_width/2, color='b', alpha=0.7, label='Robot')
             path_ax.add_artist(veh)
@@ -309,6 +311,7 @@ class TrajectoryGenerator:
         establish_heading = False
         t_temp = time.time()
         try:
+            pred_states_list = []
             while (not terminal) and t < 500.0/self.config.ts:
                 t_overhead = time.time()
                 x_init = states[-self.config.ns:] # set current state as initial state for solver
@@ -390,8 +393,9 @@ class TrajectoryGenerator:
                             stc_constraints + dyn_constraints
 
                 try:
-                    exit_status, solver_time = self.mpc_generator.run(params, mng, self.config.num_steps_taken, system_input, states)
+                    exit_status, solver_time, pred_states = self.mpc_generator.run(params, mng, self.config.num_steps_taken, system_input, states)
                     self.solver_times.append(solver_time)
+                    pred_states_list.append(pred_states)
                 except RuntimeError as err:
                     print("Fatal: Cannot run.")
                     if self.vb:
@@ -421,7 +425,7 @@ class TrajectoryGenerator:
             uv = system_input[0:len(system_input):2]
             uomega = system_input[1:len(system_input):2]
 
-            return xx, xy, uv, uomega, self.solver_times, self.overhead_times
+            return xx, xy, uv, uomega, pred_states_list, self.solver_times, self.overhead_times
 
         mng.kill()
 
@@ -441,7 +445,7 @@ class TrajectoryGenerator:
         uv = system_input[0:len(system_input):2]
         uomega = system_input[1:len(system_input):2]
 
-        return xx, xy, uv, uomega, self.solver_times, self.overhead_times
+        return xx, xy, uv, uomega, pred_states_list, self.solver_times, self.overhead_times
 
     def get_brake_vel_ref(self):
         '''
