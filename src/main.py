@@ -44,7 +44,7 @@ traj_gen = TrajectoryGenerator(config, build=init_build)
 ### Run MPC
 start = list(graph.start)
 end   = list(graph.end)
-xx,xy,uv,uomega,pred_states_list,tot_solver_time,overhead_times = traj_gen.run(graph, start, end)
+xx,xy,uv,uomega, pred_states_list,refs_list, tot_solver_time,overhead_times = traj_gen.run(graph, start, end)
 
 ### Plot results (press any key to continue if dynamic)
-traj_gen.plot_results(xx,xy,uv,uomega,pred_states_list, start, end, animation=show_animation, video=save_animation, plot_prediction=plot_prediction)
+traj_gen.plot_results(xx,xy,uv,uomega,pred_states_list,refs_list, start, end, animation=show_animation, video=save_animation, plot_prediction=plot_prediction)

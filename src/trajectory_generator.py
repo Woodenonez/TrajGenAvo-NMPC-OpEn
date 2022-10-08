@@ -74,9 +74,9 @@ class TrajectoryGenerator:
         if build:
             self.mpc_generator.build()
 
-    def plot_results(self, x_coords, y_coords, vel, omega, pred_states_list, start, end, animation=False, video=False, plot_prediction=False):
+    def plot_results(self, x_coords, y_coords, vel, omega, pred_states_list, refs_list, start, end, animation=False, video=False, plot_prediction=False):
         if animation:
-            self.plot_dynamic_results(x_coords, y_coords, vel, omega, pred_states_list, start, end, video, plot_prediction)
+            self.plot_dynamic_results(x_coords, y_coords, vel, omega, pred_states_list, refs_list, start, end, video, plot_prediction)
         else:
             self.plot_static_results(x_coords, y_coords, vel, omega, start, end)
 
@@ -115,7 +115,7 @@ class TrajectoryGenerator:
         path_ax.axis('equal')
         plt.show()
 
-    def plot_dynamic_results(self, xx, xy, vel, omega, pred_states_list, start, end, make_video, plot_prediction):
+    def plot_dynamic_results(self, xx, xy, vel, omega, pred_states_list, refs_list, start, end, make_video, plot_prediction):
         if make_video:
             from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
             fig = plt.figure(constrained_layout=True, figsize=(16,9))
@@ -148,6 +148,7 @@ class TrajectoryGenerator:
         self.ppp.plot_map(path_ax, vert_radius=self.config.vehicle_width)
         path_line, = path_ax.plot([1], '-ob', alpha=0.7, markersize=5)
         pred_line, = path_ax.plot([1], '-om', alpha=0.6, markersize=2)
+        ref_line, = path_ax.plot([1], '-xg', alpha=0.6, markersize=10)
         path_ax.set_xlabel('X [m]', fontsize=15)
         path_ax.set_ylabel('Y [m]', fontsize=15)
         path_ax.axis('equal')
@@ -174,6 +175,7 @@ class TrajectoryGenerator:
             vel_line.set_data(time, vel[:i])
             path_line.set_data(xx[:i], xy[:i])
             pred_line.set_data(np.array(pred_states_list[i])[:,0], np.array(pred_states_list[i])[:,1])
+            ref_line.set_data(refs_list[i][0,:], refs_list[i][1,:])
 
             veh = plt.Circle((xx[i], xy[i]), self.config.vehicle_width/2, color='b', alpha=0.7, label='Robot')
             path_ax.add_artist(veh)
@@ -312,6 +314,7 @@ class TrajectoryGenerator:
         t_temp = time.time()
         try:
             pred_states_list = []
+            refs_list = []
             while (not terminal) and t < 500.0/self.config.ts:
                 t_overhead = time.time()
                 x_init = states[-self.config.ns:] # set current state as initial state for solver
@@ -342,6 +345,7 @@ class TrajectoryGenerator:
                 ub_idx = min(len(ref_points), idx+5*self.config.num_steps_taken)    # reduce search space for closest reference point
 
                 _, idx = self.ppp.get_closest_vert((x_init[0], x_init[1]), ref_points[lb_idx:ub_idx])
+
                 idx += lb_idx  # idx in orignal reference trajectory list
                 if (idx+N_hor >= len(x_ref)):
                     x_finish = end
@@ -396,6 +400,7 @@ class TrajectoryGenerator:
                     exit_status, solver_time, pred_states = self.mpc_generator.run(params, mng, self.config.num_steps_taken, system_input, states)
                     self.solver_times.append(solver_time)
                     pred_states_list.append(pred_states)
+                    refs_list.append(np.array([tmpx, tmpy]))
                 except RuntimeError as err:
                     print("Fatal: Cannot run.")
                     if self.vb:
@@ -425,7 +430,7 @@ class TrajectoryGenerator:
             uv = system_input[0:len(system_input):2]
             uomega = system_input[1:len(system_input):2]
 
-            return xx, xy, uv, uomega, pred_states_list, self.solver_times, self.overhead_times
+            return xx, xy, uv, uomega, pred_states_list, refs_list, self.solver_times, self.overhead_times
 
         mng.kill()
 
@@ -445,7 +450,7 @@ class TrajectoryGenerator:
         uv = system_input[0:len(system_input):2]
         uomega = system_input[1:len(system_input):2]
 
-        return xx, xy, uv, uomega, pred_states_list, self.solver_times, self.overhead_times
+        return xx, xy, uv, uomega, pred_states_list, refs_list, self.solver_times, self.overhead_times
 
     def get_brake_vel_ref(self):
         '''
