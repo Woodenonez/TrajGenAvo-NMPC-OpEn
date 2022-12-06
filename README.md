@@ -1,6 +1,9 @@
 # MPC Trajectory Generator with Motion Prediction from MDN
 This is a trajectory generator for mobile robots based on MPC and motion prediction results from MDN (Mixture Density Network). This generator is designed to solve static and dynamic obstacle avoidance problem, besides providing a feasible trajectory given the kinematic properties of the robot. The new structure tries to separate different functions with better interfaces. Find more in the comments of [main.py](src/main.py).
 
+## New work
+This work is initiated long time ago and this repo is no-longer update-to-date. It might needs some extra work of installing the environment. For a newer version related to this work, go to [this repo](https://github.com/Woodenonez/DyObAv_MPCnWTA_Warehouse).
+
 ## Original Work
 This code is originally from [mpc-trajectory-generator](https://github.com/wljungbergh/mpc-trajectory-generator) where you can also find the related paper published in IEEE CASE2021. Here, the code is restructured and stuffed with extra code to not only make it easier to read but also introduce other forms of dynamic obstacles. Please refer to the original code if you don't consider the MDN part.
 ![Example](docs/example_image.png "Example")
